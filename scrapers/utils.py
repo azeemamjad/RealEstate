@@ -1,4 +1,5 @@
 import statistics
+from collections import defaultdict
 from datetime import datetime
 import os
 from pathlib import Path
@@ -133,5 +134,161 @@ def get_data(
     
     return total_results, file_path
 
-def create_excel_ratio(properties_data):
+def calculate_sale_ratio_with_website(*data_lists):
+    # Initialize dictionaries to store counts, websites, and ratios by platform for cities and zip codes
+    city_sale_count = defaultdict(lambda: {'forsalezillow': 0, 'forsoldzillow': 0,
+                                           'forsaleland': 0, 'forsoldland': 0,
+                                           'forsalerealtor': 0, 'forsoldrealtor': 0})
+    zip_sale_count = defaultdict(lambda: {'forsalezillow': 0, 'forsoldzillow': 0,
+                                          'forsaleland': 0, 'forsoldland': 0,
+                                          'forsalerealtor': 0, 'forsoldrealtor': 0})
+
+    # Process each list of properties
+    for data in data_lists:
+        for property in data:
+            # Extract relevant information from each property
+            city = property.get('city')
+            zip_code = property.get('zip_code')
+            website = property.get('website')  # Assumes website is included
+            for_sale = property.get('for_sale', False)  # Default to False if not specified
+
+            # Determine which platform the property came from
+            if website == 'zillow':
+                platform_prefix = 'zillow'
+            elif website == 'land_data':
+                platform_prefix = 'land'
+            elif website == 'realtor':
+                platform_prefix = 'realtor'
+            else:
+                continue  # Skip if the website is not recognized
+
+            # Update counts based on for_sale status
+            if for_sale:
+                city_sale_count[city][f'forsale{platform_prefix}'] += 1
+                zip_sale_count[zip_code][f'forsale{platform_prefix}'] += 1
+            else:
+                city_sale_count[city][f'sold{platform_prefix}'] += 1
+                zip_sale_count[zip_code][f'sold{platform_prefix}'] += 1
+
+    # Prepare the final structure with cities and zip codes, including ratios
+    result = {
+        "cities": [],
+        "zipcodes": []
+    }
+
+    # Process cities
+    for city, counts in city_sale_count.items():
+        city_data = {
+            "city": city,
+            "forsalezillow": counts['forsalezillow'],
+            "forsoldzillow": counts['forsoldzillow'],
+            "ratiozillow": (counts['forsalezillow'] / counts['forsoldzillow'] if counts['forsoldzillow'] != 0 else float('inf')),
+            "forsaleland": counts['forsaleland'],
+            "forsoldland": counts['forsoldland'],
+            "ratioland": (counts['forsaleland'] / counts['forsoldland'] if counts['forsoldland'] != 0 else float('inf')),
+            "forsalerealtor": counts['forsalerealtor'],
+            "forsoldrealtor": counts['forsoldrealtor'],
+            "ratiorealtor": (counts['forsalerealtor'] / counts['forsoldrealtor'] if counts['forsoldrealtor'] != 0 else float('inf'))
+        }
+        result['cities'].append(city_data)
+
+    # Process zip codes
+    for zip_code, counts in zip_sale_count.items():
+        zip_data = {
+            "zip_code": zip_code,
+            "forsalezillow": counts['forsalezillow'],
+            "forsoldzillow": counts['forsoldzillow'],
+            "ratiozillow": (counts['forsalezillow'] / counts['forsoldzillow'] if counts['forsoldzillow'] != 0 else float('inf')),
+            "forsaleland": counts['forsaleland'],
+            "forsoldland": counts['forsoldland'],
+            "ratioland": (counts['forsaleland'] / counts['forsoldland'] if counts['forsoldland'] != 0 else float('inf')),
+            "forsalerealtor": counts['forsalerealtor'],
+            "forsoldrealtor": counts['forsoldrealtor'],
+            "ratiorealtor": (counts['forsalerealtor'] / counts['forsoldrealtor'] if counts['forsoldrealtor'] != 0 else float('inf'))
+        }
+        result['zipcodes'].append(zip_data)
+
+    return result
+
+def create_excel_ratio(
+    search_term: str,
+    price_min: int,
+    price_max: int,
+    lot_size_min: int,
+    lot_size_max: int,
+    days_on_market: int
+):
+    zillow_for_sale = fetch_data_from_zillow(
+        search_term=search_term,
+        for_sale=True,
+        price_min=price_min,
+        price_max=price_max,
+        lot_size_min=lot_size_min,
+        lot_size_max=lot_size_max,
+        days_on_market=str(days_on_market),
+    )
+    zillow_for_sold = fetch_data_from_zillow(
+        search_term=search_term,
+        for_sale=False,
+        price_min=price_min,
+        price_max=price_max,
+        lot_size_min=lot_size_min,
+        lot_size_max=lot_size_max,
+        days_on_market=str(days_on_market),
+    )
+    land_for_sale = fetch_data_land_data(
+        search_query=search_term,
+        for_sale=True,
+        price_min=price_min,
+        price_max=price_max,
+        acre_min=lot_size_min,
+        acre_max=lot_size_max,
+        days_on_market=days_on_market,
+    )
+    land_for_sold = fetch_data_land_data(
+        search_query=search_term,
+        for_sale=False,
+        price_min=price_min,
+        price_max=price_max,
+        acre_min=lot_size_min,
+        acre_max=lot_size_max,
+        days_on_market=days_on_market,
+    )
+    realtor_for_sale = scrap_realtor_data(
+        search_query=search_term,
+        for_sale=True,
+        price_min=price_min,
+        price_max=price_max,
+        lot_area_min=lot_size_min,
+        lot_area_max=lot_size_max,
+        days_on_market=days_on_market,
+    )
+    realtor_for_sold = scrap_realtor_data(
+        search_query=search_term,
+        for_sale=False,
+        price_min=price_min,
+        price_max=price_max,
+        lot_area_min=lot_size_min,
+        lot_area_max=lot_size_max,
+        days_on_market=days_on_market,
+    )
+
+    output = calculate_sale_ratio_with_website(zillow_for_sale, zillow_for_sold,
+    land_for_sale, land_for_sold,
+    realtor_for_sale, realtor_for_sold)
+
+    print(output)
+
+
+
+
     ...
+
+create_excel_ratio(
+                search_term='Virginia',
+                price_min=0,
+                price_max=0,
+                lot_size_max=10,
+                lot_size_min=0,
+                days_on_market=200
+)
