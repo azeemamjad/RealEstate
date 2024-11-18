@@ -141,4 +141,5 @@ async def search_real_estate(payload: SearchData, website: str = Query('zillow')
         "for_sale_file_path": for_sale_file_path,
         "sold_file_path": sold_file_path,
         'excel_ratio': scrapers.utils.get_data_for_excel_ratio(combined_results),
+        'excel_ratio_file_path': scrapers.utils.generate_properties_ratio_excel(scrapers.utils.get_data_for_excel_ratio(combined_results)),
     }

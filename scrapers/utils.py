@@ -273,6 +273,8 @@ def get_data_for_excel_ratio(properties_data):
     for address, properties in for_sale_results.items():
         for prop in properties:
             market_name = prop["marketName"]
+            if market_name=="zillow":
+                continue
             county = prop["county"]
             zip_code = prop["zipCode"]
             market_data[market_name][county]["for_sale_count"] += 1
@@ -309,3 +311,108 @@ def get_data_for_excel_ratio(properties_data):
 
     return result
 
+def generate_properties_ratio_excel(excel_ratio, base_dir="static/excel"):
+    # Generate unique filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_id = str(uuid4())[:8]
+    filename = f"property_ratio_{timestamp}_{unique_id}.xlsx"
+    file_path = os.path.join(base_dir, filename)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Property Data"
+
+    # Define headers based on your specified structure
+    headers = [
+        "County",
+        "Zillow For Sale Property $40k-1M",
+        "Zillow For Sold Property - 12 mos. on market $40k-1M",
+        "For Sale/ Sold Ratio (Zillow)",
+        "DOM For Sale (Zillow)",
+        "DOM Sold (Zillow)",
+        "Realtor For Sale Property $40k-1M",
+        "Realtor For Sold Property - Recently sold on market $40K-1M",
+        "For Sale/ Sold Ratio (Realtor)",
+        "DOM Sold (Realtor)",
+        "Land For Sale Property $40k-1M",
+        "Land For Sold Property - Recently sold on market $40K-1M",
+        "For Sale/ Sold Ratio (Land)"
+    ]
+    ws.append(headers)
+
+    # Initialize an aggregated structure for counties
+    aggregated_data = {}
+
+    # Normalize market name mapping
+    market_name_mapping = {
+        "Lands": "Land",
+        "Farms": "Realtor",
+        "Zillow": "Zillow",
+    }
+
+    # Process the excel_ratio data to aggregate by county and market
+    for market_data in excel_ratio:
+        market_name = market_name_mapping.get(market_data["marketName"], market_data["marketName"])
+        for county_data in market_data["counties"]:
+            county_name = county_data["county"]
+            if county_name not in aggregated_data:
+                aggregated_data[county_name] = {
+                    f"{market.lower()}_for_sale_count": 0
+                    for market in ["Zillow", "Realtor", "Land"]
+                }
+                aggregated_data[county_name].update({
+                    f"{market.lower()}_sold_count": 0
+                    for market in ["Zillow", "Realtor", "Land"]
+                })
+                aggregated_data[county_name].update({
+                    f"{market.lower()}_dom_for_sale": "N/A"
+                    for market in ["Zillow", "Realtor", "Land"]
+                })
+                aggregated_data[county_name].update({
+                    f"{market.lower()}_dom_sold": "N/A"
+                    for market in ["Zillow", "Realtor", "Land"]
+                })
+
+            # Update counts for this county and market
+            for_sale_key = f"{market_name.lower()}_for_sale_count"
+            sold_key = f"{market_name.lower()}_sold_count"
+            aggregated_data[county_name][for_sale_key] += county_data["for_sale_count"]
+            aggregated_data[county_name][sold_key] += county_data["sold_count"]
+
+    # Write aggregated data to the Excel sheet
+    for county_name, market_data in aggregated_data.items():
+        row_data = [county_name]
+
+        # Zillow
+        for market in ["Zillow"]:
+            for_sale_count = market_data.get(f"{market.lower()}_for_sale_count", 0)
+            sold_count = market_data.get(f"{market.lower()}_sold_count", 0)
+            ratio = f"{for_sale_count / sold_count:.2f}" if sold_count > 0 else "N/A"
+            dom_for_sale = market_data.get(f"{market.lower()}_dom_for_sale", "N/A")
+            dom_sold = market_data.get(f"{market.lower()}_dom_sold", "N/A")
+            row_data.extend([for_sale_count, sold_count, ratio, dom_for_sale, dom_sold])
+
+        # Realtor
+        for market in ["Realtor"]:
+            for_sale_count = market_data.get(f"{market.lower()}_for_sale_count", 0)
+            sold_count = market_data.get(f"{market.lower()}_sold_count", 0)
+            ratio = f"{for_sale_count / sold_count:.2f}" if sold_count > 0 else "N/A"
+            dom_for_sale = market_data.get(f"{market.lower()}_dom_for_sale", "N/A")
+            dom_sold = market_data.get(f"{market.lower()}_dom_sold", "N/A")
+            row_data.extend([for_sale_count, sold_count, ratio, dom_sold])
+
+        # Land
+        for market in ["Land"]:
+            for_sale_count = market_data.get(f"{market.lower()}_for_sale_count", 0)
+            sold_count = market_data.get(f"{market.lower()}_sold_count", 0)
+            ratio = f"{for_sale_count / sold_count:.2f}" if sold_count > 0 else "N/A"
+            row_data.extend([for_sale_count, sold_count, ratio])
+
+        # Append the row to the Excel sheet
+        ws.append(row_data)
+
+    # Save the workbook
+    os.makedirs(base_dir, exist_ok=True)
+    wb.save(file_path)
+
+    return file_path
