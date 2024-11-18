@@ -12,6 +12,7 @@ from fastapi import FastAPI, Query
 
 from openpyxl.styles import PatternFill
 
+import scrapers.utils
 from scrapers.utils import get_data
 
 class SearchData(BaseModel):
@@ -24,6 +25,7 @@ class SearchData(BaseModel):
     lot_size_min: float = 0
     lot_size_max: float = 0
     days_on_market: int = 365
+    ranges: list = []
 
 # Initialize the FastAPI app
 app = FastAPI(
@@ -73,6 +75,7 @@ async def search_real_estate(payload: SearchData, website: str = Query('zillow')
         lot_size_min=input_dict.get("lot_size_min"),
         lot_size_max=input_dict.get("lot_size_max"),
         days_on_market=input_dict.get("days_on_market"),
+        ranges=input_dict.get("ranges"),
         website=website.split(","),
     )
 
@@ -93,6 +96,7 @@ async def search_real_estate(payload: SearchData, website: str = Query('zillow')
         lot_size_min=input_dict.get("lot_size_min"),
         lot_size_max=input_dict.get("lot_size_max"),
         days_on_market=input_dict.get("days_on_market"),
+        ranges=input_dict.get("ranges"),
         website=website.split(","),
     )
 
@@ -136,4 +140,5 @@ async def search_real_estate(payload: SearchData, website: str = Query('zillow')
         "numberOfSold": len(sold_results),
         "for_sale_file_path": for_sale_file_path,
         "sold_file_path": sold_file_path,
+        'excel_ratio': scrapers.utils.get_data_for_excel_ratio(combined_results),
     }

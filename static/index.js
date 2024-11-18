@@ -40,6 +40,7 @@ let soldOutResultsDiv = document.getElementById("soldOutResults");
 let soldRatio = document.getElementById("soldRatio");
 let forSaleAverageDaysOnMarket = document.getElementById("forSaleAverageDaysOnMarket");
 let soldAverageDaysOnMarket = document.getElementById("soldAverageDaysOnMarket");
+let soldFile = document.getElementById("soldFile");
 let numberOfForSale = document.getElementById("numberOfForSale");
 let numberOfSold = document.getElementById("numberOfSold");
 
@@ -48,6 +49,7 @@ function displayAddresses(
 ) {
     forSaleAverageDaysOnMarket.innerHTML = results.forSaleAverageDaysOnMarket
     soldAverageDaysOnMarket.innerHTML = results.soldAverageDaysOnMarket
+    soldFile.href = results.sold_file_path
     soldRatio.innerHTML = Number.parseFloat(results.soldRatio).toFixed(2)
     numberOfForSale.innerHTML = Number.parseFloat(results.numberOfForSale)
     numberOfSold.innerHTML = Number.parseFloat(results.numberOfSold)
@@ -57,7 +59,13 @@ function displayAddresses(
 
 
     const forSaleResults = results.search_results.for_sale_results
+    let var_7 = 0;
     for (const key in forSaleResults) {
+    var_7++;
+        if(var_7>100)
+        {
+            break;
+        }
         listing = forSaleResults[key]
         let linkButtons = "";
         let priceRows = "";
@@ -107,7 +115,13 @@ function displayAddresses(
     }
 
     const soldResults = results.search_results.sold_results
+    let var_8=0;
     for (const key in soldResults) {
+    var_8++;
+        if(var_8>100)
+        {
+            break;
+        }
         listing = soldResults[key]
         let linkButtons = "";
         let priceRows = "";
@@ -190,6 +204,7 @@ function searchAddress() {
         "days_on_market": parseInt(maxDaysOnZillow),
         "lot_size_min": minLotSize,
         "lot_size_max": maxLotSize,
+        "ranges": generateJSON(),
     };
 
     // Make the POST request

@@ -1,11 +1,11 @@
 import statistics
-from collections import defaultdict
 from datetime import datetime
 import os
 from pathlib import Path
 from uuid import uuid4
 
 from numpy.ma.core import empty
+from numpy.ma.extras import unique
 
 from scrapers.realtor.realtor_scraper import scrap_realtor_data
 from scrapers.land.land_scrapper import fetch_data_land_data
@@ -15,6 +15,8 @@ from typing import List, Optional
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill
 from openpyxl.formatting.rule import CellIsRule, FormulaRule
+
+from collections import defaultdict
 
 
 def prepare_data(properties_list):
@@ -26,15 +28,16 @@ def prepare_data(properties_list):
         acers = property.get("acres", 0)
         total_price = property.get("price", 0) if property.get("price", 0) else property.get("soldPrice", 0)
         if acers is not None and acers > 0 and total_price is not None:
-            ppa = round(float(str(total_price).replace("$", "").replace(",", "").replace("K", "000") if total_price else 0) / acers, 2)
+            ppa = round(float(str(total_price).replace("$", "").replace(",", "").replace("K", "000").replace("C", "") if total_price else 0) / acers, 2)
             entry = (acers, total_price, ppa)
+
             if entry not in unique_entries:
                 unique_entries.add(entry)
                 processed_data.append({"Acers": acers, "Price": total_price, "PPA": ppa})
 
     return sorted(processed_data, key=lambda x: x["Acers"])
 
-def create_excel(data, base_dir="static/excel"):
+def create_excel(ranges: list[dict], data, base_dir="static/excel"):
     """
     Creates an Excel workbook and adds property data with conditional formatting
     based on custom ranges provided by the user.
@@ -68,10 +71,130 @@ def create_excel(data, base_dir="static/excel"):
     for item in data:
         price = item["Price"]
         price = str(price) if isinstance(price, (int, float)) else price
-        price = float(price.replace("$", "").replace(",", "").replace("K", "000") if price else 0)
+        price = float(price.replace("$", "").replace(",", "").replace("K", "000").replace("C", "") if price else 0)
         ws.append([item["Acers"], price, item["PPA"]])
 
+    # Define color fills for each range condition
+    colors = [
+        "FF0000",  # Red
+        "00FF00",  # Green
+        "0000FF",  # Blue
+        "FFFF00",  # Yellow
+        "FFA500",  # Orange
+        "800080",  # Purple
+    ]
+    fills = [PatternFill(start_color=color, end_color=color, fill_type="solid") for color in colors]
+
+    # Apply conditional formatting based on Acers column for PPA (column C)
+    if ranges is not None:
+        for i, range_item in enumerate(ranges):
+            fill = fills[i % len(fills)]  # Use a new color fill for each range item
+
+            # Condition for "<" (Acers < value)
+            if "<" in range_item:
+                value = float(range_item["<"]["value"])  # Convert to float for comparison
+                for row in range(2, len(data) + 2):  # Start from row 2
+                    ws.conditional_formatting.add(
+                        f"C{row}",
+                        FormulaRule(formula=[f'A{row}<{value}'], fill=fill)
+                    )
+
+            # Condition for ">" (Acers > value)
+            elif ">" in range_item:
+                value = float(range_item[">"]["value"])  # Convert to float for comparison
+                for row in range(2, len(data) + 2):  # Start from row 2
+                    ws.conditional_formatting.add(
+                        f"C{row}",
+                        FormulaRule(formula=[f'A{row}>{value}'], fill=fill)
+                    )
+
+            # Condition for "ranged" (Acers between start and end)
+            elif "ranged" in range_item:
+                start = float(range_item["ranged"]["start"])
+                end = float(range_item["ranged"]["end"])
+                for row in range(2, len(data) + 2):  # Start from row 2
+                    ws.conditional_formatting.add(
+                        f"C{row}",
+                        FormulaRule(formula=[f'AND(A{row}>={start}, A{row}<={end})'], fill=fill)
+                    )
+
+    # Append extra information at the end
+    ws.append([])  # Empty row for separation
+
+    if ranges is not None:
+        for i, range_ in enumerate(ranges):
+            if "<" in range_:
+                value = float(range_["<"]["value"])
+                prices = [float(x['PPA']) for x in data if float(x['Acers']) < value]
+                if prices:
+                    median = round(statistics.median(prices), 3)
+                    median50 = round(median * 0.50, 3)
+                    median75 = round(median * 0.75, 3)
+                    ws.append([f'Less Than {int(value)} Acers'])
+                    ws.append([f'{median}', 'Median PPA'])
+                    ws.append([f'{median50}', '50%'])
+                    ws.append([f'{median75}', '75%'])
+                else:
+                    ws.append([f'Less Than {int(value)} Acers'])
+                    ws.append([f'0', 'Median PPA'])
+                    ws.append([f'0', '50%'])
+                    ws.append([f'0', '75%'])
+            elif ">" in range_:
+                value = float(range_[">"]["value"])
+                prices = [float(x['PPA']) for x in data if float(x['Acers']) > value]
+                if prices:
+                    median = round(statistics.median(prices), 3)
+                    median50 = round(median * 0.50, 3)
+                    median75 = round(median * 0.75, 3)
+                    ws.append([f'Greater Than {int(value)} Acers'])
+                    ws.append([f'{median}', 'Median PPA'])
+                    ws.append([f'{median50}', '50%'])
+                    ws.append([f'{median75}', '75%'])
+                else:
+                    ws.append([f'Less Than {int(value)} Acers'])
+                    ws.append([f'0', 'Median PPA'])
+                    ws.append([f'0', '50%'])
+                    ws.append([f'0', '75%'])
+            elif "ranged" in range_:
+                start = float(range_["ranged"]["start"])
+                end = float(range_["ranged"]["end"])
+                prices = [float(x['PPA']) for x in data if end >= float(x['Acers']) >= start]
+                if prices:
+                    median = round(statistics.median(prices), 3)
+                    median50 = round(median * 0.50, 3)
+                    median75 = round(median * 0.75, 3)
+                    ws.append([f'Between {int(start)}-{int(end)} Acers'])
+                    ws.append([f'{median}', 'Median PPA'])
+                    ws.append([f'{median50}', '50%'])
+                    ws.append([f'{median75}', '75%'])
+                else:
+                    ws.append([f'Less Than {int(value)} Acers'])
+                    ws.append([f'0', 'Median PPA'])
+                    ws.append([f'0', '50%'])
+                    ws.append([f'0', '75%'])
+            else:
+                continue
+
+    fill_index = 0
+    for i in range(len(data) + 3, ((len(ranges) * 4) + 1 + len(data) + 2) , 4):
+        fill = fills[fill_index % len(fills)]
+        ws.conditional_formatting.add(
+            f"A{i}",
+            FormulaRule(formula=[f'1=1'], fill=fill)
+        )
+        fill_index += 1
+
     ws.append([])
+    if data:
+        ws.append(["Total Properties", len(data)])
+        total_price = sum(round(float(str(item["Price"]).replace("$", "").replace(",", "").replace("K", "000").replace("C", "") if item['Price'] else 0), 3)  for item in data)
+        ws.append(["Total Price", total_price])
+        avg_price = total_price / len(data) if len(data) > 0 else 0
+        ws.append(["Average Price", avg_price])
+        min_price = min(round(float(str(item["Price"]).replace("$", "").replace(",", "").replace("K", "000").replace("C", "") if item['Price'] else 0), 3) for item in data)
+        ws.append(["Min Price", min_price])
+        max_price = max(round(float(str(item["Price"]).replace("$", "").replace(",", "").replace("K", "000").replace("C", "") if item['Price'] else 0), 3) for item in data)
+        ws.append(["Max Price", max_price])
 
     # Save the workbook
     wb.save(file_path)
@@ -88,6 +211,7 @@ def get_data(
     lot_size_min: int,
     lot_size_max: int,
     days_on_market: int,
+    ranges: list[dict],
     website: Optional[List[str]] = None,
 ):
     total_results = []
@@ -130,165 +254,53 @@ def get_data(
         
     # Process the data and create Excel file
     processed_data = prepare_data(total_results)
-    file_path = create_excel(data=processed_data)
+    file_path = create_excel(ranges=ranges,data=processed_data)
     
     return total_results, file_path
 
-def calculate_sale_ratio_with_website(*data_lists):
-    # Initialize dictionaries to store counts, websites, and ratios by platform for cities and zip codes
-    city_sale_count = defaultdict(lambda: {'forsalezillow': 0, 'forsoldzillow': 0,
-                                           'forsaleland': 0, 'forsoldland': 0,
-                                           'forsalerealtor': 0, 'forsoldrealtor': 0})
-    zip_sale_count = defaultdict(lambda: {'forsalezillow': 0, 'forsoldzillow': 0,
-                                          'forsaleland': 0, 'forsoldland': 0,
-                                          'forsalerealtor': 0, 'forsoldrealtor': 0})
+def get_data_for_excel_ratio(properties_data):
 
-    # Process each list of properties
-    for data in data_lists:
-        for property in data:
-            # Extract relevant information from each property
-            city = property.get('city')
-            zip_code = property.get('zip_code')
-            website = property.get('website')  # Assumes website is included
-            for_sale = property.get('for_sale', False)  # Default to False if not specified
+    for_sale_results = properties_data.get("for_sale_results", {})
+    sold_results = properties_data.get("sold_results", {})
 
-            # Determine which platform the property came from
-            if website == 'zillow':
-                platform_prefix = 'zillow'
-            elif website == 'land_data':
-                platform_prefix = 'land'
-            elif website == 'realtor':
-                platform_prefix = 'realtor'
-            else:
-                continue  # Skip if the website is not recognized
+    # Step 1: Extract unique counties and initialize counters
+    county_data = defaultdict(lambda: {
+        "for_sale_count": 0,
+        "sold_count": 0,
+        "zip_codes": defaultdict(lambda: {"for_sale_count": 0, "sold_count": 0})
+    })
 
-            # Update counts based on for_sale status
-            if for_sale:
-                city_sale_count[city][f'forsale{platform_prefix}'] += 1
-                zip_sale_count[zip_code][f'forsale{platform_prefix}'] += 1
-            else:
-                city_sale_count[city][f'sold{platform_prefix}'] += 1
-                zip_sale_count[zip_code][f'sold{platform_prefix}'] += 1
+    # Process for_sale_results
+    for address, properties in for_sale_results.items():
+        for prop in properties:
+            county = prop["county"]
+            zip_code = prop["zipCode"]
+            county_data[county]["for_sale_count"] += 1
+            county_data[county]["zip_codes"][zip_code]["for_sale_count"] += 1
 
-    # Prepare the final structure with cities and zip codes, including ratios
-    result = {
-        "cities": [],
-        "zipcodes": []
-    }
+    # Process sold_results
+    for address, properties in sold_results.items():
+        for prop in properties:
+            county = prop["county"]
+            zip_code = prop["zipCode"]
+            county_data[county]["sold_count"] += 1
+            county_data[county]["zip_codes"][zip_code]["sold_count"] += 1
 
-    # Process cities
-    for city, counts in city_sale_count.items():
-        city_data = {
-            "city": city,
-            "forsalezillow": counts['forsalezillow'],
-            "forsoldzillow": counts['forsoldzillow'],
-            "ratiozillow": (counts['forsalezillow'] / counts['forsoldzillow'] if counts['forsoldzillow'] != 0 else float('inf')),
-            "forsaleland": counts['forsaleland'],
-            "forsoldland": counts['forsoldland'],
-            "ratioland": (counts['forsaleland'] / counts['forsoldland'] if counts['forsoldland'] != 0 else float('inf')),
-            "forsalerealtor": counts['forsalerealtor'],
-            "forsoldrealtor": counts['forsoldrealtor'],
-            "ratiorealtor": (counts['forsalerealtor'] / counts['forsoldrealtor'] if counts['forsoldrealtor'] != 0 else float('inf'))
+    # Create output structure
+    result = []
+    for county, details in county_data.items():
+        county_summary = {
+            "county": county,
+            "for_sale_count": details["for_sale_count"],
+            "sold_count": details["sold_count"],
+            "zip_codes": []
         }
-        result['cities'].append(city_data)
-
-    # Process zip codes
-    for zip_code, counts in zip_sale_count.items():
-        zip_data = {
-            "zip_code": zip_code,
-            "forsalezillow": counts['forsalezillow'],
-            "forsoldzillow": counts['forsoldzillow'],
-            "ratiozillow": (counts['forsalezillow'] / counts['forsoldzillow'] if counts['forsoldzillow'] != 0 else float('inf')),
-            "forsaleland": counts['forsaleland'],
-            "forsoldland": counts['forsoldland'],
-            "ratioland": (counts['forsaleland'] / counts['forsoldland'] if counts['forsoldland'] != 0 else float('inf')),
-            "forsalerealtor": counts['forsalerealtor'],
-            "forsoldrealtor": counts['forsoldrealtor'],
-            "ratiorealtor": (counts['forsalerealtor'] / counts['forsoldrealtor'] if counts['forsoldrealtor'] != 0 else float('inf'))
-        }
-        result['zipcodes'].append(zip_data)
+        for zip_code, counts in details["zip_codes"].items():
+            county_summary["zip_codes"].append({
+                "zip_code": zip_code,
+                "for_sale_count": counts["for_sale_count"],
+                "sold_count": counts["sold_count"]
+            })
+        result.append(county_summary)
 
     return result
-
-def create_excel_ratio(
-    search_term: str,
-    price_min: int,
-    price_max: int,
-    lot_size_min: int,
-    lot_size_max: int,
-    days_on_market: int
-):
-    zillow_for_sale = fetch_data_from_zillow(
-        search_term=search_term,
-        for_sale=True,
-        price_min=price_min,
-        price_max=price_max,
-        lot_size_min=lot_size_min,
-        lot_size_max=lot_size_max,
-        days_on_market=str(days_on_market),
-    )
-    zillow_for_sold = fetch_data_from_zillow(
-        search_term=search_term,
-        for_sale=False,
-        price_min=price_min,
-        price_max=price_max,
-        lot_size_min=lot_size_min,
-        lot_size_max=lot_size_max,
-        days_on_market=str(days_on_market),
-    )
-    land_for_sale = fetch_data_land_data(
-        search_query=search_term,
-        for_sale=True,
-        price_min=price_min,
-        price_max=price_max,
-        acre_min=lot_size_min,
-        acre_max=lot_size_max,
-        days_on_market=days_on_market,
-    )
-    land_for_sold = fetch_data_land_data(
-        search_query=search_term,
-        for_sale=False,
-        price_min=price_min,
-        price_max=price_max,
-        acre_min=lot_size_min,
-        acre_max=lot_size_max,
-        days_on_market=days_on_market,
-    )
-    realtor_for_sale = scrap_realtor_data(
-        search_query=search_term,
-        for_sale=True,
-        price_min=price_min,
-        price_max=price_max,
-        lot_area_min=lot_size_min,
-        lot_area_max=lot_size_max,
-        days_on_market=days_on_market,
-    )
-    realtor_for_sold = scrap_realtor_data(
-        search_query=search_term,
-        for_sale=False,
-        price_min=price_min,
-        price_max=price_max,
-        lot_area_min=lot_size_min,
-        lot_area_max=lot_size_max,
-        days_on_market=days_on_market,
-    )
-
-    output = calculate_sale_ratio_with_website(zillow_for_sale, zillow_for_sold,
-    land_for_sale, land_for_sold,
-    realtor_for_sale, realtor_for_sold)
-
-    print(output)
-
-
-
-
-    ...
-
-create_excel_ratio(
-                search_term='Virginia',
-                price_min=0,
-                price_max=0,
-                lot_size_max=10,
-                lot_size_min=0,
-                days_on_market=200
-)
