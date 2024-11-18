@@ -259,48 +259,53 @@ def get_data(
     return total_results, file_path
 
 def get_data_for_excel_ratio(properties_data):
-
     for_sale_results = properties_data.get("for_sale_results", {})
     sold_results = properties_data.get("sold_results", {})
 
-    # Step 1: Extract unique counties and initialize counters
-    county_data = defaultdict(lambda: {
+    # Step 1: Separate data by marketName
+    market_data = defaultdict(lambda: defaultdict(lambda: {
         "for_sale_count": 0,
         "sold_count": 0,
         "zip_codes": defaultdict(lambda: {"for_sale_count": 0, "sold_count": 0})
-    })
+    }))
 
     # Process for_sale_results
     for address, properties in for_sale_results.items():
         for prop in properties:
+            market_name = prop["marketName"]
             county = prop["county"]
             zip_code = prop["zipCode"]
-            county_data[county]["for_sale_count"] += 1
-            county_data[county]["zip_codes"][zip_code]["for_sale_count"] += 1
+            market_data[market_name][county]["for_sale_count"] += 1
+            market_data[market_name][county]["zip_codes"][zip_code]["for_sale_count"] += 1
 
     # Process sold_results
     for address, properties in sold_results.items():
         for prop in properties:
+            market_name = prop["marketName"]
             county = prop["county"]
             zip_code = prop["zipCode"]
-            county_data[county]["sold_count"] += 1
-            county_data[county]["zip_codes"][zip_code]["sold_count"] += 1
+            market_data[market_name][county]["sold_count"] += 1
+            market_data[market_name][county]["zip_codes"][zip_code]["sold_count"] += 1
 
-    # Create output structure
+    # Step 2: Create output structure
     result = []
-    for county, details in county_data.items():
-        county_summary = {
-            "county": county,
-            "for_sale_count": details["for_sale_count"],
-            "sold_count": details["sold_count"],
-            "zip_codes": []
-        }
-        for zip_code, counts in details["zip_codes"].items():
-            county_summary["zip_codes"].append({
-                "zip_code": zip_code,
-                "for_sale_count": counts["for_sale_count"],
-                "sold_count": counts["sold_count"]
-            })
-        result.append(county_summary)
+    for market_name, county_data in market_data.items():
+        market_summary = {"marketName": market_name, "counties": []}
+        for county, details in county_data.items():
+            county_summary = {
+                "county": county,
+                "for_sale_count": details["for_sale_count"],
+                "sold_count": details["sold_count"],
+                "zip_codes": []
+            }
+            for zip_code, counts in details["zip_codes"].items():
+                county_summary["zip_codes"].append({
+                    "zip_code": zip_code,
+                    "for_sale_count": counts["for_sale_count"],
+                    "sold_count": counts["sold_count"]
+                })
+            market_summary["counties"].append(county_summary)
+        result.append(market_summary)
 
     return result
+
