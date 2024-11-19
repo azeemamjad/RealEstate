@@ -16,6 +16,31 @@ def parse_date_sold(timestamp_ms: float) -> str:
     return date_sold.strftime('%Y-%m-%d')
 
 
+def get_county_by_city(city_name, file_path="datasets/uscities.xlxs"):
+    """
+    Load the data and return the county name for a given city.
+
+    :param file_path: Path to the Excel or CSV file containing the data.
+    :param city_name: Name of the city to look up.
+    :return: County name as a string or an empty string if the city is not found.
+    """
+    try:
+        # Load the data
+        data = pd.read_excel(file_path)
+
+        # Filter the data to find the city
+        city_row = data[data['city_ascii'].str.lower() == city_name.lower()]
+
+        # Check if the city exists and return the county name, or an empty string
+        if not city_row.empty:
+            return city_row['county_name'].values[0]
+        else:
+            return ""  # Return empty string if city not found
+    except Exception as e:
+        # Handle any exceptions and log them
+        return ""
+
+
 def get_headers() -> dict:
     return {
         'accept': '*/*',
@@ -237,6 +262,7 @@ def scrape_data(
                     'address': result.get("hdpData").get("homeInfo").get("streetAddress", ""),
                     'zipCode': result.get("addressZipcode", ""),
                     'state': result.get("addressState", ""),
+                    'county':get_county_by_city(result.get("addressCity", "")),
                     'city': result.get("addressCity", ""),
                     'acres': result.get("hdpData", {}).get("homeInfo", {}).get("lotAreaValue", "") 
                             if result.get("hdpData", {}).get("homeInfo", {}).get("lotAreaUnit", "")=="acres" else float(result.get("hdpData", {}).get("homeInfo", {}).get("lotAreaValue", 0))/43560,
