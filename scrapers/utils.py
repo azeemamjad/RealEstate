@@ -377,6 +377,14 @@ def generate_properties_ratio_excel(excel_ratio, base_dir="static/excel"):
 
             # Append county data to sheet
             ws.append(row_data)
+    for market_data in excel_ratio:
+        for county_data in market_data["counties"]:
+            county_name = county_data["county"]
+            # Add county data to the first row
+            row_data = [county_name]
+
+            # Append county data to sheet
+            ws.append(row_data)
 
             # Now add zip code data under the county
             for zip_code_data in county_data["zip_codes"]:

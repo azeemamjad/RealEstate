@@ -29,16 +29,16 @@ def get_county_by_city(city_name, file_path="datasets/uscities.xlxs"):
         data = pd.read_excel(file_path)
 
         # Filter the data to find the city
-        city_row = data[data['city_ascii'].str.lower() == city_name.lower()]
+        city_row = data[data['city'].str.lower().__contains__(city_name.lower())]
 
         # Check if the city exists and return the county name, or an empty string
         if not city_row.empty:
             return city_row['county_name'].values[0]
         else:
-            return ""  # Return empty string if city not found
+            return "County Not Found" # Return empty string if city not found
     except Exception as e:
         # Handle any exceptions and log them
-        return ""
+        return "County Not Found"
 
 
 def get_headers() -> dict:
