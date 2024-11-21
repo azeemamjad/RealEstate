@@ -13,8 +13,12 @@ from scrapers.zillow.zillow_scraper import fetch_data_from_zillow
 from typing import List, Optional
 
 from openpyxl import Workbook
-from openpyxl.styles import PatternFill
 from openpyxl.formatting.rule import CellIsRule, FormulaRule
+from openpyxl.styles import PatternFill, Border, Side, Alignment
+from datetime import datetime
+from uuid import uuid4
+import os
+from itertools import cycle
 
 from collections import defaultdict
 
@@ -277,8 +281,8 @@ def get_data_for_excel_ratio(properties_data):
                 market_key = "Zillow"
             elif market_name.lower() == "realtor":
                 market_key = "Realtor"
-            elif market_name.lower() == "land":
-                market_key = "Land"
+            elif market_name.lower() == "lands":
+                market_key = "Lands"
             else:
                 continue
 
@@ -295,8 +299,8 @@ def get_data_for_excel_ratio(properties_data):
                 market_key = "Zillow"
             elif market_name.lower() == "realtor":
                 market_key = "Realtor"
-            elif market_name.lower() == "land":
-                market_key = "Land"
+            elif market_name.lower() == "lands":
+                market_key = "Lands"
             else:
                 continue
 
@@ -335,13 +339,14 @@ def generate_properties_ratio_excel(excel_ratio, base_dir="static/excel"):
     filename = f"property_ratio_{timestamp}_{unique_id}.xlsx"
     file_path = os.path.join(base_dir, filename)
 
+    # Create workbook and set active sheet
     wb = Workbook()
     ws = wb.active
     ws.title = "Property Data"
 
-    # Define headers based on your specified structure
+    # Define headers
     headers = [
-        "County / Zipcode",
+        "County",
         "Zillow For Sale Property $40k-1M",
         "Zillow For Sold Property - 12 mos. on market $40k-1M",
         "For Sale/ Sold Ratio (Zillow)",
@@ -353,63 +358,146 @@ def generate_properties_ratio_excel(excel_ratio, base_dir="static/excel"):
         "DOM Sold (Realtor)",
         "Land For Sale Property $40k-1M",
         "Land For Sold Property - Recently sold on market $40K-1M",
-        "For Sale/ Sold Ratio (Land)"
+        "For Sale/ Sold Ratio (Land)",
     ]
     ws.append(headers)
 
-    # Loop through the provided excel_ratio data and add to the sheet
+    # Apply header styles (colors and borders)
+    zillow_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")  # Red
+    realtor_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")  # Yellow
+    land_fill = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")  # Green
+    thin_border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin")
+    )
+
+    for col_index, header in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col_index, value=header)
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        if "Zillow" in header:
+            cell.fill = zillow_fill
+        elif "Realtor" in header:
+            cell.fill = realtor_fill
+        elif "Land" in header:
+            cell.fill = land_fill
+        cell.border = thin_border
+
+    # Populate rows with data
     for market_data in excel_ratio:
-        market_name = market_data["marketName"]
         for county_data in market_data["counties"]:
             county_name = county_data["county"]
-            # Add county data to the first row
             row_data = [county_name]
 
-            # Market-specific logic for data (Zillow, Realtor, Land)
-            for market_type in ["Zillow", "Realtor", "Land"]:
-                for_sale_count = county_data.get(f"{market_type.lower()}_for_sale_count", 0)
-                sold_count = county_data.get(f"{market_type.lower()}_sold_count", 0)
-                ratio = f"{for_sale_count / sold_count:.2f}" if sold_count > 0 else "N/A"
-                dom_for_sale = "N/A"  # Placeholder for future implementation
-                dom_sold = "N/A"  # Placeholder for future implementation
+            # Populate Zillow, Realtor, and Land data for counties
+            for market_type in ["zillow", "realtor", "lands"]:
+                for_sale_count = county_data.get(f"{market_type}_for_sale_count", 0)
+                sold_count = county_data.get(f"{market_type}_sold_count", 0)
+                ratio = float(f"{for_sale_count / sold_count:.2f}") if sold_count > 0 else 0
+                dom_for_sale = county_data.get(f"{market_type}_dom_for_sale", "N/A")
+                dom_sold = county_data.get(f"{market_type}_dom_sold", "N/A")
+                if market_type == "zillow":
+                    row_data.extend([for_sale_count, sold_count, ratio, dom_for_sale, dom_sold])
+                elif market_type == "realtor":
+                    row_data.extend([for_sale_count, sold_count, ratio, dom_sold])
+                else:
+                    row_data.extend([for_sale_count, sold_count, ratio])
 
-                row_data.extend([for_sale_count, sold_count, ratio, dom_for_sale, dom_sold])
+            # Ensure data matches headers
+            ws.append(row_data[:len(headers)])
 
-            # Append county data to sheet
-            ws.append(row_data)
+    ws.append([])
+    ws.append([])
+
     for market_data in excel_ratio:
         for county_data in market_data["counties"]:
             county_name = county_data["county"]
-            # Add county data to the first row
-            row_data = [county_name]
+            zip_row_data_ = [county_name]
+            ws.append(zip_row_data_)
+            # Process ZIP code data for the county
+            for zip_code_data in county_data.get("zip_codes", []):
+                zip_code = zip_code_data.get("zip_code", "Unknown ZIP")
+                zip_row_data = [f"  {zip_code}"]  # Indent ZIP codes for clarity
 
-            # Append county data to sheet
-            ws.append(row_data)
+                for market_type in ["zillow", "realtor", "lands"]:
+                    for_sale_count = zip_code_data.get(f"{market_type}_for_sale_count", 0)
+                    sold_count = zip_code_data.get(f"{market_type}_sold_count", 0)
+                    ratio = float(f"{for_sale_count / sold_count:.2f}") if sold_count > 0 else 0
+                    dom_for_sale = zip_code_data.get(f"{market_type}_dom_for_sale", "N/A")
+                    dom_sold = zip_code_data.get(f"{market_type}_dom_sold", "N/A")
+                    if market_type == "zillow":
+                        zip_row_data.extend([for_sale_count, sold_count, ratio, dom_for_sale, dom_sold])
+                    elif market_type == "realtor":
+                        zip_row_data.extend([for_sale_count, sold_count, ratio, dom_sold])
+                    else:
+                        zip_row_data.extend([for_sale_count, sold_count, ratio])
 
-            # Now add zip code data under the county
-            for zip_code_data in county_data["zip_codes"]:
-                zip_code = zip_code_data["zip_code"]
-                zip_row_data = [f"{zip_code}"]  # Add county name with zip
+                # Ensure ZIP data matches headers
+                ws.append(zip_row_data[:len(headers)])
 
-                # Repeat market-specific logic for zip codes
-                for market_type in ["Zillow", "Realtor", "Land"]:
-                    for_sale_count = zip_code_data.get(f"{market_type.lower()}_for_sale_count", 0)
-                    sold_count = zip_code_data.get(f"{market_type.lower()}_sold_count", 0)
-                    ratio = f"{for_sale_count / sold_count:.2f}" if sold_count > 0 else "N/A"
-                    dom_for_sale = "N/A"  # Placeholder for future implementation
-                    dom_sold = "N/A"  # Placeholder for future implementation
+    # Conditional formatting for ratio columns
+    ratio_columns = [4, 9, 13]  # Indices for ratio columns
 
-                    zip_row_data.extend([for_sale_count, sold_count, ratio, dom_for_sale, dom_sold])
+    # Define color fills
+    fill_light_red = PatternFill(start_color="FFA07A", end_color="FFA07A", fill_type="solid")  # Light Red
+    fill_light_yellow = PatternFill(start_color="FFFFE0", end_color="FFFFE0", fill_type="solid")  # Light Yellow
+    fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")  # Yellow
+    fill_light_green = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")  # Light Green
+    fill_green = PatternFill(start_color="008000", end_color="008000", fill_type="solid")  # Green
 
-                # Append zip code row to sheet
-                ws.append(zip_row_data)
+    for col in ratio_columns:
+        column_letter = chr(64 + col)  # Convert column index to letter
+
+        # Ratio = 0
+        ws.conditional_formatting.add(
+            f"{column_letter}2:{column_letter}1048576",
+            CellIsRule(operator="equal", formula=["0"], fill=fill_light_red)
+        )
+        ws.conditional_formatting.add(
+            f"{column_letter}2:{column_letter}1048576",
+            CellIsRule(operator="lessThanOrEqual", formula=["1"], fill=fill_light_yellow)
+        )
+        ws.conditional_formatting.add(
+            f"{column_letter}2:{column_letter}1048576",
+            CellIsRule(operator="lessThanOrEqual", formula=["2"], fill=fill_yellow)
+        )
+        ws.conditional_formatting.add(
+            f"{column_letter}2:{column_letter}1048576",
+            CellIsRule(operator="lessThanOrEqual", formula=["5"], fill=fill_light_green)
+        )
+        # Ratio > 5
+        ws.conditional_formatting.add(
+            f"{column_letter}2:{column_letter}1048576",
+            CellIsRule(operator="greaterThan", formula=["5"], fill=fill_green)
+        )
+
+    # Adjust column widths and enable text wrapping
+    for column_cells in ws.columns:
+        max_length = 10
+        column = column_cells[0].column_letter  # Get column letter
+        adjusted_width = max_length + 2  # Add padding
+        ws.column_dimensions[column].width = adjusted_width
+    ws.column_dimensions["A"].width = 25
+
+    # Freeze panes for better readability
+    ws.freeze_panes = "A2"
+
+    # Apply alternating row colors
+    row_fill_cycle = cycle([
+        PatternFill(start_color="F9F9F9", end_color="F9F9F9", fill_type="solid"),  # Light gray
+        PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")   # White
+    ])
+    for row_index, row_cells in enumerate(ws.iter_rows(min_row=2, max_row=ws.max_row), start=2):
+        fill = next(row_fill_cycle)
+        for cell in row_cells:
+            cell.fill = fill
 
     # Save the workbook
     os.makedirs(base_dir, exist_ok=True)
     wb.save(file_path)
 
     return file_path
-
 
 
 
