@@ -16,7 +16,7 @@ def parse_date_sold(timestamp_ms: float) -> str:
     return date_sold.strftime('%Y-%m-%d')
 
 
-def get_county_by_city(city_name, file_path="datasets/uscities.xlxs"):
+def get_county_by_city(city_name, cities_data):
     """
     Load the data and return the county name for a given city.
 
@@ -26,10 +26,10 @@ def get_county_by_city(city_name, file_path="datasets/uscities.xlxs"):
     """
     try:
         # Load the data
-        data = pd.read_excel(file_path)
+        data = cities_data
 
         # Filter the data to find the city
-        city_row = data[data['city'].str.lower().__contains__(city_name.lower())]
+        city_row = data[data['city_ascii'].str.lower() == city_name.lower()]
 
         # Check if the city exists and return the county name, or an empty string
         if not city_row.empty:
@@ -38,6 +38,7 @@ def get_county_by_city(city_name, file_path="datasets/uscities.xlxs"):
             return "County Not Found" # Return empty string if city not found
     except Exception as e:
         # Handle any exceptions and log them
+        print(e)
         return "County Not Found"
 
 
@@ -95,6 +96,7 @@ def scrape_data(
         price_min: int,
         price_max: int,
         for_sale: bool,
+        cities_data,
 ):
     cookies = {
         'zguid': f'24|{uuid.uuid4()}',
@@ -262,7 +264,7 @@ def scrape_data(
                     'address': result.get("hdpData").get("homeInfo").get("streetAddress", ""),
                     'zipCode': result.get("addressZipcode", ""),
                     'state': result.get("addressState", ""),
-                    'county':get_county_by_city(result.get("addressCity", "")),
+                    'county':get_county_by_city(city_name=result.get("addressCity", ""), cities_data=cities_data),
                     'city': result.get("addressCity", ""),
                     'acres': result.get("hdpData", {}).get("homeInfo", {}).get("lotAreaValue", "") 
                             if result.get("hdpData", {}).get("homeInfo", {}).get("lotAreaUnit", "")=="acres" else float(result.get("hdpData", {}).get("homeInfo", {}).get("lotAreaValue", 0))/43560,
@@ -304,6 +306,8 @@ def fetch_data_from_zillow(
     print("scraping Zillow")
     user_total_results = []
 
+    cities_data = pd.read_excel("scrapers/zillow/datasets/uscities.xlsx")
+
     user_current_page = 1
     while True:
         current_results, next_page = scrape_data(
@@ -315,6 +319,7 @@ def fetch_data_from_zillow(
             lot_size_max=lot_size_max,
             lot_size_min=lot_size_min,
             days_on_zillow=days_on_market,
+            cities_data=cities_data
         )
         user_current_page = user_current_page + 1
         user_total_results.extend(current_results)
@@ -327,15 +332,17 @@ def fetch_data_from_zillow(
 
 if __name__ == "__main__":
 
-    total_results = fetch_data_from_zillow(
-        search_term="Richmond",
-        price_min=0,  # usd
-        price_max=0,  # usd
-        for_sale=False,  # True/False
-        lot_size_max=0,  # sqft
-        lot_size_min=0,  # sqft
-        days_on_market="12m",  # days
-    )
+    print(get_county_by_city("New York"))
 
-    df = pd.DataFrame(total_results)
-    df.to_csv(f'scraped_data_{int(datetime.now().timestamp())}.csv', index=False)
+    # total_results = fetch_data_from_zillow(
+    #     search_term="Richmond",
+    #     price_min=0,  # usd
+    #     price_max=0,  # usd
+    #     for_sale=False,  # True/False
+    #     lot_size_max=0,  # sqft
+    #     lot_size_min=0,  # sqft
+    #     days_on_market="12m",  # days
+    # )
+    #
+    # df = pd.DataFrame(total_results)
+    # df.to_csv(f'scraped_data_{int(datetime.now().timestamp())}.csv', index=False)
