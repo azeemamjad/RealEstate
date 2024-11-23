@@ -189,16 +189,6 @@ def create_excel(ranges: list[dict], data, base_dir="static/excel"):
         fill_index += 1
 
     ws.append([])
-    if data:
-        ws.append(["Total Properties", len(data)])
-        total_price = sum(round(float(str(item["Price"]).replace("$", "").replace(",", "").replace("K", "000").replace("C", "") if item['Price'] else 0), 3)  for item in data)
-        ws.append(["Total Price", total_price])
-        avg_price = total_price / len(data) if len(data) > 0 else 0
-        ws.append(["Average Price", avg_price])
-        min_price = min(round(float(str(item["Price"]).replace("$", "").replace(",", "").replace("K", "000").replace("C", "") if item['Price'] else 0), 3) for item in data)
-        ws.append(["Min Price", min_price])
-        max_price = max(round(float(str(item["Price"]).replace("$", "").replace(",", "").replace("K", "000").replace("C", "") if item['Price'] else 0), 3) for item in data)
-        ws.append(["Max Price", max_price])
 
     # Save the workbook
     wb.save(file_path)
@@ -332,11 +322,11 @@ def get_data_for_excel_ratio(properties_data):
     return result
 
 
-def generate_properties_ratio_excel(excel_ratio, base_dir="static/excel"):
+def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel"):
     # Generate unique filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_id = str(uuid4())[:8]
-    filename = f"property_ratio_{timestamp}_{unique_id}.xlsx"
+    filename = f"{state}_{timestamp}_{unique_id}.xlsx"
     file_path = os.path.join(base_dir, filename)
 
     # Create workbook and set active sheet
@@ -441,36 +431,24 @@ def generate_properties_ratio_excel(excel_ratio, base_dir="static/excel"):
 
     # Define color fills
     fill_light_red = PatternFill(start_color="FFA07A", end_color="FFA07A", fill_type="solid")  # Light Red
-    fill_light_yellow = PatternFill(start_color="FFFFE0", end_color="FFFFE0", fill_type="solid")  # Light Yellow
-    fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")  # Yellow
-    fill_light_green = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")  # Light Green
     fill_green = PatternFill(start_color="008000", end_color="008000", fill_type="solid")  # Green
 
+    # Apply conditional formatting
     for col in ratio_columns:
         column_letter = chr(64 + col)  # Convert column index to letter
 
-        # Ratio = 0
+        # Green for values between 0.75 and 1.5
         ws.conditional_formatting.add(
             f"{column_letter}2:{column_letter}1048576",
-            CellIsRule(operator="equal", formula=["0"], fill=fill_light_red)
+            CellIsRule(operator="between", formula=["0.75", "1.5"], fill=fill_green)
         )
+
+        # Light Red for values greater than 1.75
         ws.conditional_formatting.add(
             f"{column_letter}2:{column_letter}1048576",
-            CellIsRule(operator="lessThanOrEqual", formula=["1"], fill=fill_light_yellow)
+            CellIsRule(operator="greaterThan", formula=["1.75"], fill=fill_light_red)
         )
-        ws.conditional_formatting.add(
-            f"{column_letter}2:{column_letter}1048576",
-            CellIsRule(operator="lessThanOrEqual", formula=["2"], fill=fill_yellow)
-        )
-        ws.conditional_formatting.add(
-            f"{column_letter}2:{column_letter}1048576",
-            CellIsRule(operator="lessThanOrEqual", formula=["5"], fill=fill_light_green)
-        )
-        # Ratio > 5
-        ws.conditional_formatting.add(
-            f"{column_letter}2:{column_letter}1048576",
-            CellIsRule(operator="greaterThan", formula=["5"], fill=fill_green)
-        )
+
 
     # Adjust column widths and enable text wrapping
     for column_cells in ws.columns:

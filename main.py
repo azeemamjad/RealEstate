@@ -101,6 +101,7 @@ async def search_real_estate(payload: SearchData, website: str = Query('zillow')
     )
 
     sold_day_on_market = [int(result.get("daysOnMarket")) for result in sold_results]
+    state = sold_results[0].get("state") if sold_results else for_sale_results[0].get("state") if for_sale_results else ""
 
     soldAverageDaysOnMarket = 0
     if not (len(sold_day_on_market)==sum(sold_day_on_market)==0):
@@ -141,5 +142,5 @@ async def search_real_estate(payload: SearchData, website: str = Query('zillow')
         "for_sale_file_path": for_sale_file_path,
         "sold_file_path": sold_file_path,
         'excel_ratio': scrapers.utils.get_data_for_excel_ratio(combined_results),
-        'excel_ratio_file_path': scrapers.utils.generate_properties_ratio_excel(scrapers.utils.get_data_for_excel_ratio(combined_results)),
+        'excel_ratio_file_path': scrapers.utils.generate_properties_ratio_excel(scrapers.utils.get_data_for_excel_ratio(combined_results), state),
     }
