@@ -432,10 +432,16 @@ def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel")
     # Define color fills
     fill_light_red = PatternFill(start_color="FFA07A", end_color="FFA07A", fill_type="solid")  # Light Red
     fill_green = PatternFill(start_color="008000", end_color="008000", fill_type="solid")  # Green
+    fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")  # Yellow
 
     # Apply conditional formatting
     for col in ratio_columns:
         column_letter = chr(64 + col)  # Convert column index to letter
+
+        ws.conditional_formatting.add(
+            f"{column_letter}2:{column_letter}1048576",
+            CellIsRule(operator="lessThan", formula=["0.75"], fill=fill_yellow)
+        )
 
         # Green for values between 0.75 and 1.5
         ws.conditional_formatting.add(
@@ -446,7 +452,7 @@ def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel")
         # Light Red for values greater than 1.75
         ws.conditional_formatting.add(
             f"{column_letter}2:{column_letter}1048576",
-            CellIsRule(operator="greaterThan", formula=["1.75"], fill=fill_light_red)
+            CellIsRule(operator="greaterThan", formula=["1.5"], fill=fill_yellow)
         )
 
 
