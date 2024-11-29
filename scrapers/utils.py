@@ -10,6 +10,7 @@ from numpy.ma.extras import unique
 from scrapers.realtor.realtor_scraper import scrap_realtor_data
 from scrapers.land.land_scrapper import fetch_data_land_data
 from scrapers.zillow.zillow_scraper import fetch_data_from_zillow
+from scrapers.redfin.redfin_scraper import fetch_data_from_redfin
 from typing import List, Optional
 
 from openpyxl import Workbook
@@ -245,6 +246,17 @@ def get_data(
             days_on_market=days_on_market,
         )
         total_results.extend(realtor_data)
+    if "redfin" in website:
+        redfin_data = fetch_data_from_redfin(
+            search_term=search_term,
+            for_sale=for_sale,
+            price_min=price_min,
+            price_max=price_max,
+            lot_size_min=lot_size_min,
+            lot_size_max=lot_size_max,
+            days_on_market=str(days_on_market) if days_on_market != 0 else "",
+        )
+        total_results.extend(redfin_data)
         
     # Process the data and create Excel file
     processed_data = prepare_data(total_results)

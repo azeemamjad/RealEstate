@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timezone
 
 import requests
@@ -5,7 +6,7 @@ import json
 
 import pandas as pd
 
-cities_data = pd.read_excel("scrapers/zillow/datasets/uscities.xlsx")
+cities_data = pd.read_excel("scrapers/redfin/datasets/uscities.xlsx") if not __name__ == "__main__" else pd.read_excel("datasets/uscities.xlsx")
 
 def get_county_by_city(city_name, cities_data=''):
     """
@@ -39,16 +40,49 @@ def convert_seconds_to_days(seconds):
     :param time_data: A dictionary with a 'value' key representing seconds.
     :return: The number of days as a float.
     """
-    days = seconds / (24 * 60 * 60)  # Convert seconds to days
-    return round(days, 2)
+    days = seconds / 86400000  # Convert seconds to days
+    return round(days)
 
 def parse_date_sold(timestamp_ms: float) -> str:
-    # Convert milliseconds to seconds by dividing by 1000
+    """
+    Converts a timestamp in milliseconds to a date in 'YYYY-MM-DD' format.
+
+    :param timestamp_ms: The timestamp in milliseconds.
+    :return: A string representing the date in 'YYYY-MM-DD' format.
+    """
+    # Convert milliseconds to seconds
     timestamp_s = timestamp_ms / 1000
     # Convert to a timezone-aware datetime object in UTC
     date_sold = datetime.fromtimestamp(timestamp_s, tz=timezone.utc)
-    # Format the date as a string (e.g., "YYYY-MM-DD HH:MM:SS UTC")
+    # Format the date as 'YYYY-MM-DD'
     return date_sold.strftime('%Y-%m-%d')
+
+def parse_and_format_date(date_str: str) -> str:
+    """
+    Parses a date string in the format 'OCT 17, 2024' and converts it to 'YYYY-MM-DD'.
+
+    :param date_str: The date string to parse (e.g., 'OCT 17, 2024').
+    :return: A string representing the date in 'YYYY-MM-DD' format.
+    """
+    # Parse the input string to a datetime object
+    parsed_date = datetime.strptime(date_str, "%b %d, %Y")
+    # Format the datetime object as 'YYYY-MM-DD'
+    return parsed_date.strftime("%Y-%m-%d")
+
+def calculate_days_from_date(date_str: str) -> int:
+    """
+    Calculates the number of days from the given date to the current date.
+
+    :param date_str: The date string in 'YYYY-MM-DD' format (e.g., '2024-09-10').
+    :return: The number of days as an integer.
+    """
+    # Parse the input date string to a datetime object
+    given_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    # Get the current date
+    current_date = datetime.now().date()
+    # Calculate the difference in days
+    delta = (current_date - given_date).days
+    return delta
 
 def get_regional_data(search_query: str):
     cookies = {
@@ -149,10 +183,7 @@ def get_regional_data(search_query: str):
         rows = section.get("rows", [])
         for row in rows:
             locations.append(row.get("id", "").split('_'))
-    if len(locations) > 5:
-        return locations[:5]
-    else:
-        return locations
+    return locations
 
 
 def fetch_data_from_redfin(
@@ -163,7 +194,7 @@ def fetch_data_from_redfin(
         price_min: int,
         price_max: int,
         for_sale: bool,
-        cities_data: cities_data
+        cities_data = cities_data
 ):
     cookies = {
         'RF_BROWSER_ID': 'V2vhRHVYSw6uwV_MkNqW-Q',
@@ -216,7 +247,7 @@ def fetch_data_from_redfin(
 
     params = {
         "al": "1",
-        # "include_nearby_homes": "false",
+        "include_nearby_homes": "true",
         # "market": "hamptonroads",
 
         # 'max_price': '8000000',
@@ -242,6 +273,27 @@ def fetch_data_from_redfin(
 
     data = []
 
+    # for sale or sold? days on market?
+    if for_sale:
+        if days_on_market:
+            params.update({'time_on_market_range': f'{days_on_market}-'})
+    else:
+        if days_on_market:
+            params.update({'sold_within_days': f'{days_on_market}'})
+        else:
+            params.update({'sold_within_days': '90'})  # necessary to get for sold data
+
+    # price
+    if price_max:
+        params.update({'max_price': f'{price_max}'})
+    if price_min:
+        params.update({'min_price': f'{price_min}'})
+
+    # acres
+    if lot_size_min:
+        params.update({'min_parcel_size': f'{lot_size_min * 43560}'})
+    if lot_size_max:
+        params.update({'max_parcel_size': f'{lot_size_max * 43560}'})
 
     for region in get_regional_data(search_term):
         # setting region
@@ -249,30 +301,6 @@ def fetch_data_from_redfin(
         params.update({'region_id':f'{region_id}', 'region_type': f'{region_type}'})
 
         print(region_id, region_type)
-
-        # for sale or sold? days on market?
-        if for_sale:
-            if days_on_market:
-                params.update({'time_on_market_range':f'{days_on_market}_'})
-        else:
-            if days_on_market:
-                params.update({'sold_within_days': f'{days_on_market}'})
-            else:
-                params.update({'sold_within_days': '7'}) # necessary to get for sold data
-
-        # price
-        if price_max:
-            params.update({'max_price': f'{price_max}'})
-        if price_min:
-            params.update({'min_price': f'{price_min}'})
-
-        # acres
-        if lot_size_min:
-            params.update({'min_parcel_size': f'{lot_size_min*43560}'})
-        if lot_size_max:
-            params.update({'max_parcel_size': f'{lot_size_max * 43560}'})
-
-
 
         # Make the GET request
         response = requests.get(
@@ -293,19 +321,22 @@ def fetch_data_from_redfin(
                     'state': f'{home.get("state", "")}',
                     'county': f'{get_county_by_city(city_name=home.get('city', ""), cities_data=cities_data)}',
                     'city': f'{home.get('city', "")}',
-                    'acres': f'{round(home.get("lotSize", {}).get("value", 0)/43560, 3)}',
+                    'acres': round(home.get("lotSize", {}).get("value", 0)/43560, 3),
                     'linkToList': f'https://www.redfin.com{home.get("url", "")}',
                     'marketName': 'Redfin',
                 })
             if for_sale:
                 datum.update({
                     'daysOnMarket': f'{convert_seconds_to_days(home.get("timeOnRedfin", {}).get("value", 0))}',
-                    'price': f'{home.get("price", {}).get("value", 0)}',
+                    'price': home.get("price", {}).get("value", 0),
                 })
             else:
+                sold_date = f'{parse_date_sold(home.get("soldDate", 0))}' if home.get("soldDate") else parse_and_format_date(home.get("sashes")[0].get("lastSaleDate", ""))
+                calculated_days = calculate_days_from_date(sold_date)
                 datum.update({
-                    'soldPrice': f'{home.get("price", {}).get("value", 0)}',
-                    'soldDate': f'{parse_date_sold(home.get("soldDate", 0))}'
+                    'daysOnMarket': calculated_days,
+                    'soldPrice': home.get("price", {}).get("value", 0),
+                    'soldDate': sold_date
                 })
             data.append(datum)
 
@@ -317,11 +348,12 @@ if __name__ == "__main__":
             search_term="Virginia",
             price_min=0,  # usd
             price_max=0,  # usd
-            for_sale=True,  # True/False
+            for_sale=False,  # True/False
             lot_size_max=0,  # sqft
             lot_size_min=0,  # sqft
-            days_on_market="",  # days
+            days_on_market="112",  # days
             cities_data=cities_data,
         )
 
+    print(data)
     print(len(data))
