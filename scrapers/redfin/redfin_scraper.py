@@ -196,6 +196,7 @@ def fetch_data_from_redfin(
         for_sale: bool,
         cities_data = cities_data
 ):
+    print('Scraping Redfin')
     cookies = {
         'RF_BROWSER_ID': 'V2vhRHVYSw6uwV_MkNqW-Q',
         'RF_BROWSER_ID_GREAT_FIRST_VISIT_TIMESTAMP': '2024-11-26T11%3A58%3A51.451746',
@@ -277,6 +278,7 @@ def fetch_data_from_redfin(
     if for_sale:
         if days_on_market:
             params.update({'time_on_market_range': f'{days_on_market}-'})
+            params.update({"sf": "1,2,3,5,6,7",})
     else:
         if days_on_market:
             params.update({'sold_within_days': f'{days_on_market}'})
@@ -299,8 +301,6 @@ def fetch_data_from_redfin(
         # setting region
         region_type, region_id = region
         params.update({'region_id':f'{region_id}', 'region_type': f'{region_type}'})
-
-        print(region_id, region_type)
 
         # Make the GET request
         response = requests.get(
@@ -339,8 +339,7 @@ def fetch_data_from_redfin(
                     'soldDate': sold_date
                 })
             data.append(datum)
-
-    print(len(data))
+        print(len(data))
     return data
 
 if __name__ == "__main__":
