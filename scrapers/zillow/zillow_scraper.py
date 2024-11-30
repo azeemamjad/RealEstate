@@ -302,11 +302,10 @@ def fetch_data_from_zillow(
         price_min: int,
         price_max: int,
         for_sale: bool,
+        cities_data
 ):
     print("scraping Zillow")
     user_total_results = []
-
-    cities_data = pd.read_excel("scrapers/zillow/datasets/uscities.xlsx")
 
     user_current_page = 1
     while True:

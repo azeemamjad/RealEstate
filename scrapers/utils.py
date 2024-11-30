@@ -21,7 +21,11 @@ from uuid import uuid4
 import os
 from itertools import cycle
 
+import pandas as pd
+
 from collections import defaultdict
+
+cities_data = pd.read_excel("datasets/uscities.xlsx")
 
 
 def prepare_data(properties_list):
@@ -220,32 +224,10 @@ def get_data(
             lot_size_min=lot_size_min,
             lot_size_max=lot_size_max,
             days_on_market=str(days_on_market),
+            cities_data=cities_data
         )
         total_results.extend(zillow_data)
 
-    if "land" in website:
-        land_data = fetch_data_land_data(
-            search_query=search_term,
-            for_sale=for_sale,
-            price_min=price_min,
-            price_max=price_max,
-            acre_min=lot_size_min,
-            acre_max=lot_size_max,
-            days_on_market=days_on_market,
-        )
-        total_results.extend(land_data)
-
-    if "realtor" in website:
-        realtor_data = scrap_realtor_data(
-            search_query=search_term,
-            for_sale=for_sale,
-            price_min=price_min,
-            price_max=price_max,
-            lot_area_min=lot_size_min,
-            lot_area_max=lot_size_max,
-            days_on_market=days_on_market,
-        )
-        total_results.extend(realtor_data)
     if "redfin" in website:
         redfin_data = fetch_data_from_redfin(
             search_term=search_term,
@@ -255,6 +237,7 @@ def get_data(
             lot_size_min=lot_size_min,
             lot_size_max=lot_size_max,
             days_on_market=str(days_on_market) if days_on_market != 0 else "",
+            cities_data=cities_data
         )
         total_results.extend(redfin_data)
         
@@ -281,10 +264,8 @@ def get_data_for_excel_ratio(properties_data):
             market_name = prop["marketName"]
             if market_name.lower() == "zillow":
                 market_key = "Zillow"
-            elif market_name.lower() == "realtor":
-                market_key = "Realtor"
-            elif market_name.lower() == "lands":
-                market_key = "Lands"
+            elif market_name.lower() == "redfin":
+                market_key = "Redfin"
             else:
                 continue
 
@@ -299,10 +280,8 @@ def get_data_for_excel_ratio(properties_data):
             market_name = prop["marketName"]
             if market_name.lower() == "zillow":
                 market_key = "Zillow"
-            elif market_name.lower() == "realtor":
-                market_key = "Realtor"
-            elif market_name.lower() == "lands":
-                market_key = "Lands"
+            elif market_name.lower() == "redfin":
+                market_key = "Redfin"
             else:
                 continue
 
@@ -354,13 +333,10 @@ def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel")
         "For Sale/ Sold Ratio (Zillow)",
         "DOM For Sale (Zillow)",
         "DOM Sold (Zillow)",
-        "Realtor For Sale Property $40k-1M",
-        "Realtor For Sold Property - Recently sold on market $40K-1M",
-        "For Sale/ Sold Ratio (Realtor)",
-        "DOM Sold (Realtor)",
-        "Land For Sale Property $40k-1M",
-        "Land For Sold Property - Recently sold on market $40K-1M",
-        "For Sale/ Sold Ratio (Land)",
+        "Redfin For Sale Property $40k-1M",
+        "Redfin For Sold Property - Recently sold on market $40K-1M",
+        "For Sale/ Sold Ratio (Redfin)",
+        "DOM Sold (Redfin)",
     ]
     ws.append(headers)
 
@@ -380,10 +356,8 @@ def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel")
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         if "Zillow" in header:
             cell.fill = zillow_fill
-        elif "Realtor" in header:
+        elif "Redfin" in header:
             cell.fill = realtor_fill
-        elif "Land" in header:
-            cell.fill = land_fill
         cell.border = thin_border
 
     # Populate rows with data
@@ -393,7 +367,7 @@ def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel")
             row_data = [county_name]
 
             # Populate Zillow, Realtor, and Land data for counties
-            for market_type in ["zillow", "realtor", "lands"]:
+            for market_type in ["zillow", "redfin"]:
                 for_sale_count = county_data.get(f"{market_type}_for_sale_count", 0)
                 sold_count = county_data.get(f"{market_type}_sold_count", 0)
                 ratio = float(f"{for_sale_count / sold_count:.2f}") if sold_count > 0 else 0
@@ -401,10 +375,10 @@ def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel")
                 dom_sold = county_data.get(f"{market_type}_dom_sold", "N/A")
                 if market_type == "zillow":
                     row_data.extend([for_sale_count, sold_count, ratio, dom_for_sale, dom_sold])
-                elif market_type == "realtor":
+                elif market_type == "redfin":
                     row_data.extend([for_sale_count, sold_count, ratio, dom_sold])
                 else:
-                    row_data.extend([for_sale_count, sold_count, ratio])
+                    continue
 
             # Ensure data matches headers
             ws.append(row_data[:len(headers)])
@@ -422,7 +396,7 @@ def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel")
                 zip_code = zip_code_data.get("zip_code", "Unknown ZIP")
                 zip_row_data = [f"  {zip_code}"]  # Indent ZIP codes for clarity
 
-                for market_type in ["zillow", "realtor", "lands"]:
+                for market_type in ["zillow", "redfin"]:
                     for_sale_count = zip_code_data.get(f"{market_type}_for_sale_count", 0)
                     sold_count = zip_code_data.get(f"{market_type}_sold_count", 0)
                     ratio = float(f"{for_sale_count / sold_count:.2f}") if sold_count > 0 else 0
@@ -430,16 +404,14 @@ def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel")
                     dom_sold = zip_code_data.get(f"{market_type}_dom_sold", "N/A")
                     if market_type == "zillow":
                         zip_row_data.extend([for_sale_count, sold_count, ratio, dom_for_sale, dom_sold])
-                    elif market_type == "realtor":
+                    elif market_type == "redfin":
                         zip_row_data.extend([for_sale_count, sold_count, ratio, dom_sold])
-                    else:
-                        zip_row_data.extend([for_sale_count, sold_count, ratio])
 
                 # Ensure ZIP data matches headers
                 ws.append(zip_row_data[:len(headers)])
 
     # Conditional formatting for ratio columns
-    ratio_columns = [4, 9, 13]  # Indices for ratio columns
+    ratio_columns = [4, 9]  # Indices for ratio columns
 
     # Define color fills
     fill_light_red = PatternFill(start_color="FFA07A", end_color="FFA07A", fill_type="solid")  # Light Red

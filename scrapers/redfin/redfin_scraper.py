@@ -6,9 +6,7 @@ import json
 
 import pandas as pd
 
-cities_data = pd.read_excel("scrapers/redfin/datasets/uscities.xlsx") if not __name__ == "__main__" else pd.read_excel("datasets/uscities.xlsx")
-
-def get_county_by_city(city_name, cities_data=''):
+def get_county_by_city(city_name, cities_data):
     """
     Load the data and return the county name for a given city.
 
@@ -194,7 +192,7 @@ def fetch_data_from_redfin(
         price_min: int,
         price_max: int,
         for_sale: bool,
-        cities_data = cities_data
+        cities_data
 ):
     print('Scraping Redfin')
     cookies = {
@@ -351,7 +349,7 @@ if __name__ == "__main__":
             lot_size_max=0,  # sqft
             lot_size_min=0,  # sqft
             days_on_market="112",  # days
-            cities_data=cities_data,
+            cities_data = [],
         )
 
     print(data)
