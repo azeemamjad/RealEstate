@@ -55,7 +55,7 @@ def get_properties_data(json_response: dict, for_sale: bool) -> List[dict]:
                                 })
 
                         result.update({
-                                'linkToList': f"https://www.realtor.com/realestateandhomes-detail/{property_.get("permalink", "")}",
+                                'linkToList': f"https://www.realtor.com/realestateandhomes-detail/{property_.get('permalink', '')}",
                         })
 
                         results.append(result)

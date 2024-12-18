@@ -142,5 +142,10 @@ async def search_real_estate(payload: SearchData, website: str = Query('zillow')
         "for_sale_file_path": for_sale_file_path,
         "sold_file_path": sold_file_path,
         'excel_ratio': scrapers.utils.get_data_for_excel_ratio(combined_results),
-        'excel_ratio_file_path': scrapers.utils.generate_properties_ratio_excel(scrapers.utils.get_data_for_excel_ratio(combined_results), state),
+        'excel_ratio_file_path': scrapers.utils.generate_properties_ratio_excel(
+            scrapers.utils.get_data_for_excel_ratio(combined_results),
+            state, 
+            price_min=input_dict.get("price_min"), 
+            price_max=input_dict.get("price_max"),
+            days_on_market=input_dict.get("days_on_market")),
     }

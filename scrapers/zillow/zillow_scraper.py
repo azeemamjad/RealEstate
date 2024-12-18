@@ -16,7 +16,7 @@ def parse_date_sold(timestamp_ms: float) -> str:
     return date_sold.strftime('%Y-%m-%d')
 
 
-def get_county_by_city(city_name, cities_data):
+def get_county_by_city(addressZipcode, cities_data):
     """
     Load the data and return the county name for a given city.
 
@@ -28,12 +28,15 @@ def get_county_by_city(city_name, cities_data):
         # Load the data
         data = cities_data
 
-        # Filter the data to find the city
-        city_row = data[data['city_ascii'].str.lower() == city_name.lower()]
+        data['Zip Code'] = data['Zip Code'].astype(str)
+        addressZipcode = str(addressZipcode)
+        
+        # Filter the data to find the row with the matching zip code
+        county_row = data[data['Zip Code'] == addressZipcode]
 
-        # Check if the city exists and return the county name, or an empty string
-        if not city_row.empty:
-            return city_row['county_name'].values[0]
+        # Check if the row exists and return the county name, or an empty string
+        if not county_row.empty:
+            return county_row.iloc[0]['County Name']
         else:
             return "County Not Found" # Return empty string if city not found
     except Exception as e:
@@ -254,7 +257,6 @@ def scrape_data(
 
     if response.ok:
         response_data: dict = response.json()
-
         is_next_page = response_data.get("cat1", {}).get("searchList", {}).get("pagination", {})
         is_next_page = is_next_page.get("nextUrl", None) if is_next_page else None
         is_next_page = True if is_next_page else False
@@ -264,7 +266,7 @@ def scrape_data(
                     'address': result.get("hdpData").get("homeInfo").get("streetAddress", ""),
                     'zipCode': result.get("addressZipcode", ""),
                     'state': result.get("addressState", ""),
-                    'county':get_county_by_city(city_name=result.get("addressCity", ""), cities_data=cities_data),
+                    'county':get_county_by_city(addressZipcode=result.get("addressZipcode", ""), cities_data=cities_data),
                     'city': result.get("addressCity", ""),
                     'acres': result.get("hdpData", {}).get("homeInfo", {}).get("lotAreaValue", "") 
                             if result.get("hdpData", {}).get("homeInfo", {}).get("lotAreaUnit", "")=="acres" else float(result.get("hdpData", {}).get("homeInfo", {}).get("lotAreaValue", 0))/43560,
@@ -331,7 +333,7 @@ def fetch_data_from_zillow(
 
 if __name__ == "__main__":
 
-    print(get_county_by_city("New York"))
+    print(get_county_by_city("86046"))
 
     # total_results = fetch_data_from_zillow(
     #     search_term="Richmond",

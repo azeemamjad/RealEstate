@@ -25,7 +25,7 @@ import pandas as pd
 
 from collections import defaultdict
 
-cities_data = pd.read_excel("datasets/uscities.xlsx")
+cities_data = pd.read_csv("datasets/us_zip_fips_county.csv", encoding='latin1')
 
 
 def prepare_data(properties_list):
@@ -46,7 +46,7 @@ def prepare_data(properties_list):
 
     return sorted(processed_data, key=lambda x: x["Acers"])
 
-def create_excel(ranges: list[dict], data, base_dir="static/excel"):
+def create_excel(ranges: list[dict], data, base_dir="static/excel", state="newyork"):
     """
     Creates an Excel workbook and adds property data with conditional formatting
     based on custom ranges provided by the user.
@@ -70,7 +70,7 @@ def create_excel(ranges: list[dict], data, base_dir="static/excel"):
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Property Data"
+    ws.title = f"{state}"
 
     # Append headers
     headers = ["Acers", "Price", "PPA"]
@@ -243,7 +243,7 @@ def get_data(
         
     # Process the data and create Excel file
     processed_data = prepare_data(total_results)
-    file_path = create_excel(ranges=ranges,data=processed_data)
+    file_path = create_excel(ranges=ranges,data=processed_data,state=search_term)
     
     return total_results, file_path
 
@@ -313,28 +313,32 @@ def get_data_for_excel_ratio(properties_data):
     return result
 
 
-def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel"):
+def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel", price_min=20000, price_max=250000, days_on_market=180):
     # Generate unique filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_id = str(uuid4())[:8]
     filename = f"{state}_{timestamp}_{unique_id}.xlsx"
     file_path = os.path.join(base_dir, filename)
 
+    months_on_market = round(days_on_market / 30)
+    price_range = f"${int(price_min/1000)}k-{int(price_max/1000)}k"
+    days_range = f"{months_on_market} mos."
+
     # Create workbook and set active sheet
     wb = Workbook()
     ws = wb.active
-    ws.title = "Property Data"
+    ws.title = f"{state}"
 
     # Define headers
     headers = [
         "County",
-        "Zillow For Sale Property $40k-1M",
-        "Zillow For Sold Property - 12 mos. on market $40k-1M",
+        f"Zillow For Sale Property {price_range}",
+        f"Zillow For Sold Property - {days_range} on market {price_range}",
         "For Sale/ Sold Ratio (Zillow)",
         "DOM For Sale (Zillow)",
         "DOM Sold (Zillow)",
-        "Redfin For Sale Property $40k-1M",
-        "Redfin For Sold Property - Recently sold on market $40K-1M",
+        f"Redfin For Sale Property {price_range}",
+        f"Redfin For Sold Property - {days_range} on market {price_range}",
         "For Sale/ Sold Ratio (Redfin)",
         "DOM Sold (Redfin)",
     ]

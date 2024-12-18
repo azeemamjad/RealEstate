@@ -1,1 +1,5 @@
 .venv.
+venv
+__MACOSX
+__pycache__
+static/excel/
