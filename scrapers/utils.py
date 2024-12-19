@@ -416,6 +416,9 @@ def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel",
 
     # Conditional formatting for ratio columns
     ratio_columns = [4, 9]  # Indices for ratio columns
+    dom_columns = [5, 6, 9, 10]
+    fill_dom_red = PatternFill(start_color="FFA07A", end_color="FFA07A", fill_type="solid")  # Light Red
+    fill_dom_green = PatternFill(start_color="008000", end_color="008000", fill_type="solid")  # Green
 
     # Define color fills
     fill_light_red = PatternFill(start_color="FFA07A", end_color="FFA07A", fill_type="solid")  # Light Red
@@ -423,24 +426,19 @@ def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel",
     fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")  # Yellow
 
     # Apply conditional formatting
-    for col in ratio_columns:
+    for col in dom_columns:
         column_letter = chr(64 + col)  # Convert column index to letter
 
+        # Light Red for DOM > 180 days
         ws.conditional_formatting.add(
             f"{column_letter}2:{column_letter}1048576",
-            CellIsRule(operator="lessThan", formula=["0.75"], fill=fill_yellow)
+            CellIsRule(operator="greaterThan", formula=["180"], fill=fill_dom_red)
         )
 
-        # Green for values between 0.75 and 1.5
+        # Green for DOM <= 180 days
         ws.conditional_formatting.add(
             f"{column_letter}2:{column_letter}1048576",
-            CellIsRule(operator="between", formula=["0.75", "1.5"], fill=fill_green)
-        )
-
-        # Light Red for values greater than 1.75
-        ws.conditional_formatting.add(
-            f"{column_letter}2:{column_letter}1048576",
-            CellIsRule(operator="greaterThan", formula=["1.5"], fill=fill_yellow)
+            CellIsRule(operator="lessThanOrEqual", formula=["180"], fill=fill_dom_green)
         )
 
 
