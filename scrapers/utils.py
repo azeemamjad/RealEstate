@@ -323,8 +323,8 @@ def get_data_for_excel_ratio(properties_data):
                     "zip_code": zip_code,
                     f"{market_name.lower()}_for_sale_count": counts["for_sale_count"],
                     f"{market_name.lower()}_sold_count": counts["sold_count"],
-                    f"{market_name.lower()}_average_days_on_market_for_sale": counts["total_days_on_market_for_sale"] / counts["for_sale_count"] if counts["for_sale_count"] > 0 else 0,
-                    f"{market_name.lower()}_average_days_on_market_sold": counts["total_days_on_market_sold"] / counts["sold_count"] if counts["sold_count"] > 0 else 0
+                    f"{market_name.lower()}_dom_for_sale": counts["total_days_on_market_for_sale"] ,
+                    f"{market_name.lower()}_dom_sold": counts["total_days_on_market_sold"]
                 })
             market_summary["counties"].append(county_summary)
         result.append(market_summary)
