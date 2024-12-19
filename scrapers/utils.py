@@ -255,7 +255,14 @@ def get_data_for_excel_ratio(properties_data):
     market_data = defaultdict(lambda: defaultdict(lambda: {
         "for_sale_count": 0,
         "sold_count": 0,
-        "zip_codes": defaultdict(lambda: {"for_sale_count": 0, "sold_count": 0})
+        "total_days_on_market_for_sale": 0,
+        "total_days_on_market_sold": 0,
+        "zip_codes": defaultdict(lambda: {
+            "for_sale_count": 0,
+            "sold_count": 0,
+            "total_days_on_market_for_sale": 0,
+            "total_days_on_market_sold": 0
+        })
     }))
 
     # Process for_sale_results
@@ -271,8 +278,12 @@ def get_data_for_excel_ratio(properties_data):
 
             county = prop["county"]
             zip_code = prop["zipCode"]
+            days_on_market = prop.get("daysOnMarket", 0)
+
             market_data[market_key][county]["for_sale_count"] += 1
+            market_data[market_key][county]["total_days_on_market_for_sale"] = int(days_on_market)
             market_data[market_key][county]["zip_codes"][zip_code]["for_sale_count"] += 1
+            market_data[market_key][county]["zip_codes"][zip_code]["total_days_on_market_for_sale"] = int(days_on_market)
 
     # Process sold_results
     for address, properties in sold_results.items():
@@ -287,8 +298,12 @@ def get_data_for_excel_ratio(properties_data):
 
             county = prop["county"]
             zip_code = prop["zipCode"]
+            days_on_market = prop.get("daysOnMarket", 0)
+
             market_data[market_key][county]["sold_count"] += 1
+            market_data[market_key][county]["total_days_on_market_sold"] = int(days_on_market)
             market_data[market_key][county]["zip_codes"][zip_code]["sold_count"] += 1
+            market_data[market_key][county]["zip_codes"][zip_code]["total_days_on_market_sold"] = int(days_on_market)
 
     # Step 2: Create output structure
     result = []
@@ -299,13 +314,17 @@ def get_data_for_excel_ratio(properties_data):
                 "county": county,
                 f"{market_name.lower()}_for_sale_count": details["for_sale_count"],
                 f"{market_name.lower()}_sold_count": details["sold_count"],
+                f"{market_name.lower()}_dom_for_sale": details["total_days_on_market_for_sale"] ,
+                f"{market_name.lower()}_dom_sold": details["total_days_on_market_sold"],
                 "zip_codes": []
             }
             for zip_code, counts in details["zip_codes"].items():
                 county_summary["zip_codes"].append({
                     "zip_code": zip_code,
                     f"{market_name.lower()}_for_sale_count": counts["for_sale_count"],
-                    f"{market_name.lower()}_sold_count": counts["sold_count"]
+                    f"{market_name.lower()}_sold_count": counts["sold_count"],
+                    f"{market_name.lower()}_average_days_on_market_for_sale": counts["total_days_on_market_for_sale"] / counts["for_sale_count"] if counts["for_sale_count"] > 0 else 0,
+                    f"{market_name.lower()}_average_days_on_market_sold": counts["total_days_on_market_sold"] / counts["sold_count"] if counts["sold_count"] > 0 else 0
                 })
             market_summary["counties"].append(county_summary)
         result.append(market_summary)
