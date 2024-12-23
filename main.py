@@ -149,3 +149,6 @@ async def search_real_estate(payload: SearchData, website: str = Query('zillow')
             price_max=input_dict.get("price_max"),
             days_on_market=input_dict.get("days_on_market")),
     }
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
