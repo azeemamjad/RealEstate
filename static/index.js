@@ -45,63 +45,81 @@ let detailedReport = document.getElementById("detailedReport");
 let numberOfForSale = document.getElementById("numberOfForSale");
 let numberOfSold = document.getElementById("numberOfSold");
 
-function displayAddresses(
-    results
-) {
-    forSaleAverageDaysOnMarket.innerHTML = results.forSaleAverageDaysOnMarket
-    soldAverageDaysOnMarket.innerHTML = results.soldAverageDaysOnMarket
-    soldFile.href = results.sold_file_path
-    detailedReport.href = results.excel_ratio_file_path
-    soldRatio.innerHTML = Number.parseFloat(results.soldRatio).toFixed(2)
-    numberOfForSale.innerHTML = Number.parseFloat(results.numberOfForSale)
-    numberOfSold.innerHTML = Number.parseFloat(results.numberOfSold)
+let forSaleResultsBatch = 0;
+let soldResultsBatch = 0;
+const BATCH_SIZE = 20; // Load 20 entries at a time
+let forSaleResults = [];
+let soldResults = [];
+let isLoading = false; // Prevent multiple triggers during scroll
+
+function displayAddresses(results) {
+    // Initialize global results for infinite scrolling
+    forSaleResults = results.search_results.for_sale_results;
+    soldResults = results.search_results.sold_results;
+
     // Clear previous results
     forSaleResultsDiv.innerHTML = "";
     soldOutResultsDiv.innerHTML = "";
 
+    // Load the first batch of data
+    loadMoreForSaleResults();
+    loadMoreSoldResults();
 
-    const forSaleResults = results.search_results.for_sale_results
-    let var_7 = 0;
-    for (const key in forSaleResults) {
-        var_7++;
-        if (var_7 > 100) {
-            break;
-        }
-        listing = forSaleResults[key]
+    // Attach infinite scroll listener
+    window.addEventListener("scroll", handleScroll);
+}
+
+function loadMoreForSaleResults() {
+    if (isLoading) return; // Prevent reloading
+    isLoading = true;
+
+    const keys = Object.keys(forSaleResults);
+    const startIndex = forSaleResultsBatch * BATCH_SIZE;
+    const endIndex = Math.min(startIndex + BATCH_SIZE, keys.length);
+
+    forSaleResultsBatch++;
+    for (let i = startIndex; i < endIndex; i++) {
+        const key = keys[i];
+        const listing = forSaleResults[key];
+
         let linkButtons = "";
         let priceRows = "";
         let sizeRows = "";
         let daysOnMarketRows = "";
-        let imgRow = ""
+        let imgSrc = "";
 
-        const truncatedName = key;
         listing.forEach((item) => {
             linkButtons += `
             <a href="${item.linkToList}" target="_blank" class="flex items-center justify-center bg-blue-100 text-blue-900 p-2 rounded-full m-1">
-            <img src="/static/assets/${item.marketName.toLowerCase()}.png" alt="${item.marketName}" class="w-6 h-6">
+                <img src="/static/assets/${item.marketName.toLowerCase()}.png" alt="${item.marketName}" class="w-6 h-6">
             </a>`;
             priceRows += `<p><span class="text-lg font-bold text-green-700 mb-2 flex justify-end">${formatPrice(item.price.toString().replace("$", "").replace(",", ""))} &nbsp;
-            <img src="/static/assets/${item.marketName.toLowerCase()}.png" alt="${item.marketName}" class="w-6 h-6"></span></p>`
+                <img src="/static/assets/${item.marketName.toLowerCase()}.png" alt="${item.marketName}" class="w-6 h-6"></span></p>`;
+            sizeRows += `<p class="text-black text-sm">Acres: <span class="font-medium">${item.acres.toFixed(2)} - ${item.marketName}</span></p>`;
+            daysOnMarketRows += `<p class="text-black">Days on ${item.marketName}: <span class="font-medium">${item.daysOnMarket}</span></p>`;
+            imgSrc = item.imgSrc; // Assign card image source
+        });
 
-            sizeRows += `<p class="text-black text-sm">Acres: <span class="font-medium">${item.acres.toFixed(2)} - ${item.marketName}</span></p>`
-
-            daysOnMarketRows += `<p class="text-black">Days on ${item.marketName}: <span class="font-medium">${item.daysOnMarket}</span></p>`
-
-        })
+        // Ensure the URL is not modified or encoded unnecessarily
+        const imageHTML = imgSrc
+            ? `
+            <div class="relative">
+                <div class="absolute inset-0 flex justify-center items-center bg-gray-200 rounded-t-lg loader-container">
+                    <div class="loader"></div>
+                </div>
+                <img src="${imgSrc}" alt="Google Map Image" class="w-full h-48 object-cover rounded-t-lg" loading="lazy" 
+                    onload="this.previousElementSibling.style.display='none';" 
+                    onerror="this.previousElementSibling.style.display='none'; this.style.display='none';">
+            </div>`
+            : "";
 
         const addressHTML = `
             <div class="max-w-sm bg-white border border-gray-200 rounded-lg shadow">
+                ${imageHTML}
                 <div class="p-5">
                     ${priceRows}
                     <div class="flex justify-between items-center mb-3">
-                        <h5 class="text-md font-bold tracking-tight text-gray-900" style="
-                            font-family: 'Arial', sans-serif;
-                            color: #333;
-                            overflow: hidden; 
-                            white-space: nowrap;
-                            text-overflow: 
-                            max-width: 70%; 
-                        ">${truncatedName}</h5>
+                        <h5 class="text-md font-bold tracking-tight text-gray-900">${key}</h5>
                     </div>
                     ${sizeRows}
                     ${daysOnMarketRows}
@@ -111,51 +129,63 @@ function displayAddresses(
                 </div>
             </div>
         `;
-
         forSaleResultsDiv.innerHTML += addressHTML;
     }
+    isLoading = false;
+}
 
-    const soldResults = results.search_results.sold_results
-    let var_8 = 0;
-    for (const key in soldResults) {
-        var_8++;
-        if (var_8 > 100) {
-            break;
-        }
-        listing = soldResults[key]
+function loadMoreSoldResults() {
+    if (isLoading) return; // Prevent reloading
+    isLoading = true;
+
+    const keys = Object.keys(soldResults);
+    const startIndex = soldResultsBatch * BATCH_SIZE;
+    const endIndex = Math.min(startIndex + BATCH_SIZE, keys.length);
+
+    soldResultsBatch++;
+    for (let i = startIndex; i < endIndex; i++) {
+        const key = keys[i];
+        const listing = soldResults[key];
+
         let linkButtons = "";
         let priceRows = "";
         let sizeRows = "";
         let daysOnMarketRows = "";
-        let imgRow = ""
-        let soldDate = ""
-        const truncatedName = key;
+        let soldDate = "";
+        let imgSrc = "";
+
         listing.forEach((item) => {
             linkButtons += `
             <a href="${item.linkToList}" target="_blank" class="flex items-center justify-center bg-blue-100 text-blue-900 p-2 rounded-full m-1">
                 <img src="/static/assets/${item.marketName.toLowerCase()}.png" alt="${item.marketName}" class="w-6 h-6">
             </a>`;
-            priceRows += `<p><span class="text-lg font-bold text-green-700 mb-2 flex justify-end">${formatPrice(item.soldPrice)}  &nbsp;
-                <img src="/static/assets/${item.marketName.toLowerCase()}.png" alt="${item.marketName}" class="w-6 h-6"></span></p>`
+            priceRows += `<p><span class="text-lg font-bold text-green-700 mb-2 flex justify-end">${formatPrice(item.soldPrice)} &nbsp;
+                <img src="/static/assets/${item.marketName.toLowerCase()}.png" alt="${item.marketName}" class="w-6 h-6"></span></p>`;
+            sizeRows += `<p class="text-black text-sm">Acres: <span class="font-medium">${item.acres.toFixed(2)} - ${item.marketName}</span></p>`;
+            daysOnMarketRows += `<p class="text-black">Days on ${item.marketName}: <span class="font-medium">${item.daysOnMarket}</span></p>`;
+            soldDate = item.soldDate;
+            imgSrc = item.imgSrc; // Assign card image source
+        });
 
-            sizeRows += `<p class="text-black text-sm">Acres: <span class="font-medium">${item.acres.toFixed(2)} - ${item.marketName}</span></p>`
+        const imageHTML = imgSrc
+            ? `
+            <div class="relative">
+                <div class="absolute inset-0 flex justify-center items-center bg-gray-200 rounded-t-lg loader-container">
+                    <div class="loader"></div>
+                </div>
+                <img src="${imgSrc}" alt="Google Map Image" class="w-full h-48 object-cover rounded-t-lg" loading="lazy" 
+                    onload="this.previousElementSibling.style.display='none';" 
+                    onerror="this.previousElementSibling.style.display='none'; this.style.display='none';">
+            </div>`
+            : "";
 
-            daysOnMarketRows += `<p class="text-black">Days on ${item.marketName}: <span class="font-medium">${item.daysOnMarket}</span></p>`
-            soldDate = item.soldDate
-        })
         const addressHTML = `
             <div class="max-w-sm bg-white border border-gray-200 rounded-lg shadow">
+                ${imageHTML}
                 <div class="p-5">
                     ${priceRows}
                     <div class="flex justify-between items-center mb-3">
-                        <h5 class="text-md font-bold tracking-tight text-gray-900" style="
-                            font-family: 'Arial', sans-serif;
-                            color: #333;
-                            overflow: hidden; 
-                            white-space: nowrap;
-                            text-overflow: 
-                            max-width: 70%; 
-                        ">${truncatedName}</h5>
+                        <h5 class="text-md font-bold tracking-tight text-gray-900">${key}</h5>
                     </div>
                     ${sizeRows}
                     <p>Sold Date: ${soldDate}</p>
@@ -166,11 +196,19 @@ function displayAddresses(
                 </div>
             </div>
         `;
-
         soldOutResultsDiv.innerHTML += addressHTML;
     }
-
+    isLoading = false;
 }
+
+function handleScroll() {
+    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50 && !isLoading) {
+        loadMoreForSaleResults();
+        loadMoreSoldResults();
+    }
+}
+
+
 function searchAddress() {
     soldRatio.innerHTML = "Not Results";
     forSaleAverageDaysOnMarket.innerHTML = "Not Results";

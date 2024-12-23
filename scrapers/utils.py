@@ -340,7 +340,16 @@ def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel",
     file_path = os.path.join(base_dir, filename)
 
     months_on_market = round(days_on_market / 30)
-    price_range = f"${int(price_min/1000)}k-{int(price_max/1000)}k"
+    min = int(price_min/1000)
+    max = int(price_max/1000)
+
+    if min < 1000 and max < 1000:
+        price_range = f"${min}k-{max}k"
+    if min < 1000 and max > 1000:
+        price_range = f"${min}k-{float(max/1000)}M"
+    if min > 1000 and max > 1000:
+        price_range = f"${float(min/1000)}M-{float(max/1000)}M"
+        
     days_range = f"{months_on_market} mos."
 
     # Create workbook and set active sheet
