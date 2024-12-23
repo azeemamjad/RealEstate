@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from fastapi import FastAPI, Query
 
 from openpyxl.styles import PatternFill
+import uvicorn
 
 import scrapers.utils
 from scrapers.utils import get_data
