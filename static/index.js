@@ -56,6 +56,14 @@ function displayAddresses(results) {
     // Initialize global results for infinite scrolling
     forSaleResults = results.search_results.for_sale_results;
     soldResults = results.search_results.sold_results;
+    
+    forSaleAverageDaysOnMarket.innerHTML = results.forSaleAverageDaysOnMarket
+    soldAverageDaysOnMarket.innerHTML = results.soldAverageDaysOnMarket
+    soldFile.href = results.sold_file_path
+    detailedReport.href = results.excel_ratio_file_path
+    soldRatio.innerHTML = Number.parseFloat(results.soldRatio).toFixed(2)
+    numberOfForSale.innerHTML = Number.parseFloat(results.numberOfForSale)
+    numberOfSold.innerHTML = Number.parseFloat(results.numberOfSold)
 
     // Clear previous results
     forSaleResultsDiv.innerHTML = "";

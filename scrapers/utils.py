@@ -453,21 +453,17 @@ def generate_properties_ratio_excel(excel_ratio, state, base_dir="static/excel",
     fill_green = PatternFill(start_color="008000", end_color="008000", fill_type="solid")  # Green
     fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")  # Yellow
 
-    # Apply conditional formatting
+    # Define the header fills
+    header_fill_red = PatternFill(start_color="FFA07A", end_color="FFA07A", fill_type="solid")  # Light Red for DOM > 180
+    header_fill_green = PatternFill(start_color="008000", end_color="008000", fill_type="solid")  # Green for DOM <= 180
+
+    # Apply header styles for DOM columns
     for col in dom_columns:
         column_letter = chr(64 + col)  # Convert column index to letter
+        header_cell = ws[f"{column_letter}1"]  # Get header cell (row 1, column letter)
+        header_cell.fill = header_fill_red if col in [5, 9] else header_fill_green  # Apply specific color
+        header_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-        # Light Red for DOM > 180 days
-        ws.conditional_formatting.add(
-            f"{column_letter}2:{column_letter}1048576",
-            CellIsRule(operator="greaterThan", formula=["180"], fill=fill_dom_red)
-        )
-
-        # Green for DOM <= 180 days
-        ws.conditional_formatting.add(
-            f"{column_letter}2:{column_letter}1048576",
-            CellIsRule(operator="lessThanOrEqual", formula=["180"], fill=fill_dom_green)
-        )
 
 
     # Adjust column widths and enable text wrapping
