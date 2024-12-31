@@ -125,7 +125,7 @@ def get_regional_data(search_query: str):
 
     response_json = json.loads(response.content[4:])
     locations = []
-    sections = response_json.get("payload", {}).get("sections", [])[:1]
+    sections = response_json.get("payload", {}).get("sections", [])
     for section in sections:
         rows = section.get("rows", [])
         for row in rows[1:]:
@@ -133,6 +133,16 @@ def get_regional_data(search_query: str):
             d.append(row)
             locations.append(d)
     return locations
+
+def convert_timestamp_to_date(timestamp_ms):
+    # Convert milliseconds to seconds
+    timestamp_s = timestamp_ms / 1000
+    
+    # Convert to datetime
+    date_time = datetime.utcfromtimestamp(timestamp_s)
+    
+    # Return the date in a human-readable format
+    return date_time.strftime('%Y-%m-%d %H:%M:%S')
 
 
 def fetch_data_from_redfin(
@@ -164,29 +174,18 @@ def fetch_data_from_redfin(
     }
 
     params = {
-        "al": "1",
-        "include_nearby_homes": "true",
-        # "market": "hamptonroads",
-
-        # 'max_price': '8000000',
-        # 'min_price': '125000',
-
-        # "max_parcel_size": "4356000",
-        # "min_parcel_size": "8000",
-
-        "mpt": "99",
-        "num_homes": "350",
-        # "ord": "redfin-recommended-asc",
-        "page_number": "1",
-
-        # "sf": "1,2,3,5,6,7",
-        # "start": "0",
-        # "status": "9",
-        # "time_on_market_range": "3-",
-        # 'sold_within_days': '90',
-
-        "uipt": "5",
-        "v": "8"
+        'al': '1',
+        'include_nearby_homes': 'true',
+        'mpt': '99',
+        'num_homes': '350',
+        'ord': 'redfin-recommended-asc',
+        'page_number': '1',
+        'region_type': '6',
+        'sf': '1,2,3,5,6,7',
+        'start': '0',
+        'status': '9',
+        'uipt': '5',
+        'v': '8'
     }
 
     data = []
@@ -217,8 +216,8 @@ def fetch_data_from_redfin(
     for region in region_data:
         # setting region
         region_type, region_id, _ = region
-        params.update({'market': _.get("name").lower()})
-        params.update({'region_id':f'{region_id}', 'region_type': 6})
+        params.update({'market': _.get("name").lower().split(" ")[0]})
+        params.update({'region_id':f'{region_id}'})
 
         # Make the GET request
         response = requests.get(
@@ -227,6 +226,7 @@ def fetch_data_from_redfin(
             # cookies=cookies,
             params=params
         )
+        
         response_json = json.loads(response.content[4:])
         homes = response_json.get("payload", {}).get("homes", [])
         homes.extend(response_json.get("payload", {}).get("originalHomes", {}).get("homes", []))
@@ -249,8 +249,8 @@ def fetch_data_from_redfin(
                     'price': home.get("price", {}).get("value", 0),
                 })
             else:
-                sold_date = f'{parse_date_sold(home.get("soldDate", 0))}' if home.get("soldDate") else parse_and_format_date(home.get("sashes")[0].get("lastSaleDate", ""))
-                calculated_days = calculate_days_from_date(sold_date)
+                sold_date = f'{parse_date_sold(home.get("soldDate", 0))}' if home.get("soldDate") else parse_and_format_date(home.get("sashes")[0].get("lastSaleDate", "")) if home.get("sashes") and home.get("sashes")[0].get("lastSaleDate", "") else None
+                calculated_days = calculate_days_from_date(sold_date) if sold_date else "0"
                 datum.update({
                     'daysOnMarket': calculated_days,
                     'soldPrice': home.get("price", {}).get("value", 0),
